@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/* shadcn/ui-style tokens: neutral palette, one accent, status colours. */
+@theme {
+  --color-background: oklch(0.985 0.002 250);
+  --color-foreground: oklch(0.21 0.02 260);
+  --color-card: oklch(1 0 0);
+  --color-muted: oklch(0.96 0.004 250);
+  --color-muted-foreground: oklch(0.5 0.02 260);
+  --color-border: oklch(0.91 0.006 250);
+  --color-primary: oklch(0.45 0.13 262);
+  --color-primary-foreground: oklch(0.98 0 0);
+  --color-ring: oklch(0.6 0.13 262);
+  --color-destructive: oklch(0.55 0.2 27);
+  --color-met: oklch(0.52 0.13 150);
+  --color-partial: oklch(0.62 0.13 75);
+  --color-missing: oklch(0.55 0.18 27);
+  --color-highlight: oklch(0.96 0.06 95);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

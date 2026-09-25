@@ -178,7 +178,7 @@ export function fakeAnswer(input: TaskInputs["answer"]): string {
       if (intent === "gaps") {
         if (missing.length === 0) lines.push(`- ${name}: no gaps found against the listed requirements.`);
         for (const r of missing) {
-          lines.push(`- ${name}: missing ${r.skill} (${r.priority === "must" ? "must-have" : "nice-to-have"})${cite(refFor(context, job.label, r.skill))}`);
+          lines.push(`- ${name}: missing ${r.skill} (${r.priority === "must" ? "must-have" : "nice-to-have"})${cite(refFor(context, job.label, r.text))}`);
         }
       } else {
         const evidence = met

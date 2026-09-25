@@ -161,3 +161,39 @@ chat span/generation order. The injected-JD test from Phase 2
   delimited documents, rules in the system prompt only, a code-level refusal
   path, citation validation, and fit rows mapped by index. There's no
   classifier for injected text. The README lists this as a limitation.
+
+## Phase 4 — Frontend (plan)
+
+**Files** (`apps/web/src`)
+- `lib/api.ts`: typed fetch wrappers. Every response is parsed with the shared
+  Zod schemas and errors surface the server's `ApiError.message`.
+- `lib/sse.ts`: an incremental SSE parser (`createSseParser().feed(chunk)`)
+  that handles split frames and validates each event against `ChatEvent`.
+  `streamChat()` runs it over `fetch` + `ReadableStream`, so the stop button
+  is just `AbortController.abort()`.
+- `lib/answer.ts`: splits answer text into text / citation segments. Only
+  refs present in the verified `citations` event become links.
+- `components/ui/*`: shadcn/ui-style primitives (Button, Badge, Card, Tabs,
+  Alert, Spinner) written in the same idiom (Tailwind classes + variants).
+- `components/DocumentsPanel`, `ChatPanel`, `AnswerText`, `EvidencePanel`,
+  `FitMatrix`, `CompareView`, `App` (three-panel layout; below `xl` the
+  evidence panel becomes a slide-over).
+
+**Tests** (vitest, node environment): SSE parser (split frames, multiple
+events per chunk, invalid JSON, schema-invalid events), answer segmentation,
+and citation rendering through `react-dom/server`. Rendering to static markup
+covers what matters (which markers become buttons, their labels) without
+adding jsdom or Testing Library.
+
+**Assumptions**
+- **shadcn/ui**: its components are copied source, and the generated
+  versions pull in Radix, `class-variance-authority`, `clsx` and
+  `tailwind-merge`. None of those are on the approved dependency list, so I
+  wrote the handful of primitives this UI needs in the shadcn idiom (same
+  names, variants and tokens) without them. Swapping in the generated
+  components later is mechanical.
+- **Tailwind v4** via `@tailwindcss/vite`, Tailwind's own first-party Vite
+  plugin. I count it as part of "tailwindcss" rather than a new dependency.
+- Chat history lives in client state for the page session. The server
+  persists messages for context, but there's no "reload a past conversation"
+  view (out of scope).
