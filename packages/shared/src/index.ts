@@ -14,6 +14,8 @@ export const DocumentSummary = z.object({
   title: z.string(),
   /** Human label such as "Job #2" — what users type in questions. */
   label: z.string(),
+  filename: z.string(),
+  chunkCount: z.number().int().nonnegative(),
   createdAt: z.string().datetime(),
 });
 export type DocumentSummary = z.infer<typeof DocumentSummary>;
@@ -34,6 +36,7 @@ export const Requirement = z.object({
   skill: z.string(),
   priority: z.enum(["must", "nice"]),
 });
+export type Requirement = z.infer<typeof Requirement>;
 
 export const JobProfile = z.object({
   title: z.string(),
@@ -42,7 +45,29 @@ export const JobProfile = z.object({
 });
 export type JobProfile = z.infer<typeof JobProfile>;
 
+/** What the resume claims, with the sentence that backs each claim. */
+export const ResumeSkill = z.object({
+  skill: z.string(),
+  evidence: z.string(),
+  years: z.number().nonnegative().optional(),
+});
+
+export const ResumeProfile = z.object({
+  name: z.string().optional(),
+  headline: z.string().optional(),
+  skills: z.array(ResumeSkill),
+});
+export type ResumeProfile = z.infer<typeof ResumeProfile>;
+
+export const DocumentDetail = DocumentSummary.extend({
+  profile: z.union([JobProfile, ResumeProfile]),
+  /** In document order, so the evidence panel can show the whole document. */
+  chunks: z.array(Chunk),
+});
+export type DocumentDetail = z.infer<typeof DocumentDetail>;
+
 export const FitStatus = z.enum(["met", "partial", "missing"]);
+export type FitStatus = z.infer<typeof FitStatus>;
 
 export const FitRow = z.object({
   requirement: Requirement,
@@ -59,12 +84,15 @@ export type Intent = z.infer<typeof Intent>;
 
 export const ChatRequest = z.object({
   sessionId: z.string().uuid(),
-  message: z.string().min(1).max(2000),
+  message: z.string().trim().min(1).max(2000),
 });
 export type ChatRequest = z.infer<typeof ChatRequest>;
 
 export const Citation = z.object({
+  /** The marker the model wrote in the answer text, e.g. "C3". */
+  ref: z.string(),
   chunkId: z.string().uuid(),
+  documentId: z.string().uuid(),
   documentLabel: z.string(),
   snippet: z.string(),
 });
@@ -79,3 +107,20 @@ export const ChatEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("error"), message: z.string() }),
 ]);
 export type ChatEvent = z.infer<typeof ChatEvent>;
+
+// ---- Misc ------------------------------------------------------------------
+
+export const ReadyResponse = z.object({
+  status: z.enum(["ready", "unavailable"]),
+  store: z.enum(["postgres", "memory"]),
+  /** "fake" means deterministic stand-ins are answering: fine for demos, not for advice. */
+  ai: z.enum(["real", "fake"]),
+  embeddings: z.enum(["real", "fake"]),
+});
+export type ReadyResponse = z.infer<typeof ReadyResponse>;
+
+export const ApiError = z.object({
+  error: z.string(),
+  message: z.string(),
+});
+export type ApiError = z.infer<typeof ApiError>;

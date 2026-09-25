@@ -7,20 +7,32 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
     "eval": "tsx ../../evals/run.ts",
     "lint": "echo 'todo: eslint'"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "@career-intel/shared": "workspace:*",
     "@fastify/cors": "^10.0.1",
+    "@fastify/multipart": "^10.1.2",
+    "@fastify/rate-limit": "^11.2.0",
+    "drizzle-orm": "^0.45.3",
     "fastify": "^5.1.0",
+    "langfuse": "^3.39.2",
+    "mammoth": "^1.12.3",
     "pino": "^9.5.0",
-    "zod": "^3.23.8"
+    "postgres": "^3.4.9",
+    "unpdf": "^1.8.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
+    "drizzle-kit": "^0.31.11",
+    "testcontainers": "^12.1.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.0",
     "vitest": "^2.1.5"
