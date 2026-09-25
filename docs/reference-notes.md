@@ -75,3 +75,54 @@ testcontainers (skipped when Docker is unavailable).
 - Test fixtures for DOCX/PDF are generated inside the test (a DOCX is a zip,
   and I hand-assemble a minimal PDF). This avoids committing binaries and
   adding a zip/PDF writer dependency.
+
+## Phase 2 — Retrieval + chat (plan)
+
+**Files** (all pure logic is its own module with its own tests)
+- `lib/fusion.ts`: `reciprocalRankFusion(lists, k = 60)`. Unit-tested against
+  hand-worked examples.
+- `lib/filters.ts`: `resolveMentions(message, docs)` → job ids named as
+  "Job #2" / "job 2", by title, or by company. Pure and tested.
+- `lib/router.ts`: intent router (fast model, structured `{ intent }`).
+- `lib/strategy.ts`: an explicit `Intent → ContextStrategy` table (which
+  documents, whether to include profiles, how many chunks from the resume and
+  jobs).
+- `lib/prompt.ts`: `buildPrompt()` is pure and snapshot-tested. System rules
+  first. Documents go in `<document id label kind>` tags inside a block marked
+  as untrusted data, with `<` escaped so text can't close a tag. Chunks carry
+  short refs (`C1`, `C2`, ...) for citation. The rules say to reply
+  "not found in your documents" rather than guess. History is trimmed to a
+  token budget, and the running summary goes in the final user turn.
+- `lib/history.ts`: `trimHistory()` keeps the last N messages within budget
+  and reports the ones that overflowed, which then get summarised.
+- `lib/citations.ts`: `extractCitations()` keeps only refs that were in the
+  context, deduplicated, in order of appearance.
+- `services/retrieve.ts`: hybrid retrieval (vector top-k + full-text top-k,
+  then RRF) scoped to document ids.
+- `services/chat.ts`: `answerQuestion()` is an async generator of
+  `ChatEvent`s (session → mentions → route → context → prompt → stream →
+  citations → persist). The HTTP route is a thin SSE adapter over it, and
+  evals call it directly.
+- `services/fit.ts` + `GET /jobs/:id/fit`: one structured call on the answer
+  model per job. Evidence refs are mapped back to chunk ids and validated,
+  cached in `fit_cache` (cleared on any document change), with in-process
+  de-duplication of concurrent requests.
+
+**Context strategy trade-off**: for fit/gaps/compare, the prompt gets every
+relevant profile (compact, structured, complete) plus retrieved evidence
+chunks for citations. A resume plus a few JDs is a few thousand tokens, so
+completeness beats the token savings of pure top-k. Top-k alone can drop the
+one requirement that matters for "what am I missing?". General and
+interview-prep questions use retrieval only. Past roughly 20 documents I'd
+drop the profiles-for-everything approach and summarise per job instead.
+
+**Citations**: the model cites short refs (`[C3]`) rather than UUIDs. Short
+refs are more reliable to reproduce and cheaper. The server maps refs back
+to chunk ids, drops any ref it didn't supply, and sends the verified list in
+the `citations` event. `Citation` gained `ref` and `documentId` so the client
+can link markers to evidence.
+
+**Tests**: RRF, mentions, router, prompt snapshot (including an injection
+document), history trimming, citation validation, chat SSE via `inject`
+(event order, persistence, citations only from context, not-found path),
+and the fit route (cache hit, invalidation, 409 without a resume).

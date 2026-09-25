@@ -8,8 +8,10 @@ import { AiProviderError, HttpError, safeErrorForLog } from "./lib/errors.js";
 import { LlmError } from "./lib/llm.js";
 import { ParseError } from "./lib/parse.js";
 import { IngestError } from "./services/ingest.js";
+import { chatRoutes } from "./routes/chat.js";
 import { documentRoutes } from "./routes/documents.js";
 import { healthRoutes } from "./routes/health.js";
+import { jobRoutes } from "./routes/jobs.js";
 
 function toApiError(err: unknown): { status: number; body: ApiError } {
   if (err instanceof HttpError) return { status: err.statusCode, body: { error: err.code, message: err.message } };
@@ -73,6 +75,8 @@ export async function buildApp(config: Config, injected?: Partial<Deps>) {
   await app.register(multipart);
   await app.register(healthRoutes, { deps, config });
   await app.register(documentRoutes, { deps, config });
+  await app.register(jobRoutes, { deps });
+  await app.register(chatRoutes, { deps, config });
 
   return app;
 }
