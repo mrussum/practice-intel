@@ -29,7 +29,8 @@ export function parseId(params: unknown): string {
 }
 
 export async function documentRoutes(app: FastifyInstance, { deps, config }: { deps: Deps; config: Config }) {
-  app.post("/documents", async (req, reply) => {
+  // Each upload costs an extraction call and embeddings, so it has a tighter limit.
+  app.post("/documents", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (req, reply) => {
     const query = UploadQuery.safeParse(req.query);
     if (!query.success) throw new HttpError(400, "invalid_kind", 'Add ?kind=resume or ?kind=job to the upload URL.');
     if (!req.isMultipart()) throw new HttpError(400, "not_multipart", "Send the file as multipart/form-data in a field named \"file\".");
@@ -38,10 +39,15 @@ export async function documentRoutes(app: FastifyInstance, { deps, config }: { d
     if (!file) throw new HttpError(400, "missing_file", "No file received. Attach one PDF, DOCX, TXT or MD file.");
     const bytes = await file.toBuffer(); // throws 413 past the size limit
 
+    const trace = deps.tracer.startTrace("ingest", { id: req.id, input: { kind: query.data.kind, bytes: bytes.length } });
+    const span = trace.span("ingest");
     const { document, usages } = await ingestDocument(deps, { kind: query.data.kind, filename: file.filename, bytes });
+    span.end({ chunks: document.chunkCount });
+    usages.forEach((u) => trace.generation(u));
+    const totals = trace.end({ documentId: document.id });
     // Sizes and counts only: document text never goes to the logs.
     req.log.info(
-      { documentId: document.id, kind: document.kind, bytes: bytes.length, chunks: document.chunkCount, llmCalls: usages.length },
+      { documentId: document.id, kind: document.kind, bytes: bytes.length, chunks: document.chunkCount, ...totals },
       "document ingested",
     );
     return reply.code(201).send(toSummary(document));

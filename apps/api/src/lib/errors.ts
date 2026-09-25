@@ -25,6 +25,7 @@ export function safeErrorForLog(err: unknown): { type: string; message: string; 
     type: err.name,
     message: (source.message.split("\n")[0] ?? "").slice(0, 300),
     code: (source as { code?: unknown }).code,
-    stack: err.stack?.split("\n").slice(1, 6).join("\n") ?? "",
+    // Frames only: the stack's first lines repeat the (unsafe) message.
+    stack: (err.stack ?? "").split("\n").filter((l) => l.trimStart().startsWith("at ")).slice(0, 5).join("\n"),
   };
 }

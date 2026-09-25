@@ -6,10 +6,10 @@ import type { Deps } from "../deps.js";
 
 export async function healthRoutes(app: FastifyInstance, { deps, config }: { deps: Deps; config: Config }) {
   // Liveness: the process is up. Never touches dependencies.
-  app.get("/health", async () => ({ status: "ok" }));
+  app.get("/health", { config: { rateLimit: false } }, async () => ({ status: "ok" }));
 
   // Readiness: can we serve traffic? Checks the store and reports AI mode.
-  app.get("/ready", async (req, reply) => {
+  app.get("/ready", { config: { rateLimit: false } }, async (req, reply) => {
     const body: ReadyResponse = {
       status: "ready",
       store: deps.store.kind,

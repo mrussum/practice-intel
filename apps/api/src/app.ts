@@ -1,6 +1,7 @@
 import Fastify, { type FastifyError } from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
 import type { ApiError } from "@career-intel/shared";
 import type { Config } from "./config.js";
 import { createDeps, type Deps } from "./deps.js";
@@ -36,17 +37,23 @@ function toApiError(err: unknown): { status: number; body: ApiError } {
  * Builds the app without listening, so tests can use `app.inject()`
  * against the real routing/validation stack with no network.
  */
-export async function buildApp(config: Config, injected?: Partial<Deps>) {
+export async function buildApp(
+  config: Config,
+  injected?: Partial<Deps>,
+  options: { logStream?: NodeJS.WritableStream } = {},
+) {
+  const loggerOptions = {
+    level: config.LOG_LEVEL,
+    serializers: { err: safeErrorForLog },
+    // Belt and braces: never log credentials even if a header is logged.
+    redact: ["req.headers.authorization", "req.headers.cookie", "req.headers[\"x-api-key\"]"],
+  };
   const app = Fastify({
-    logger:
-      config.NODE_ENV === "test"
+    logger: options.logStream
+      ? { ...loggerOptions, stream: options.logStream }
+      : config.NODE_ENV === "test"
         ? false
-        : {
-            level: config.LOG_LEVEL,
-            serializers: { err: safeErrorForLog },
-            // Belt and braces: never log credentials even if a header is logged.
-            redact: ["req.headers.authorization", "req.headers.cookie", "req.headers[\"x-api-key\"]"],
-          },
+        : loggerOptions,
     genReqId: (req) => {
       const incoming = req.headers["x-request-id"];
       return typeof incoming === "string" && /^[\w-]{8,64}$/.test(incoming) ? incoming : crypto.randomUUID();
@@ -55,7 +62,10 @@ export async function buildApp(config: Config, injected?: Partial<Deps>) {
   });
 
   const deps: Deps = { ...(await createDeps(config)), ...injected };
-  app.addHook("onClose", () => deps.store.close());
+  app.addHook("onClose", async () => {
+    await deps.tracer.shutdown();
+    await deps.store.close();
+  });
   app.addHook("onSend", async (req, reply) => {
     reply.header("x-request-id", req.id);
   });
@@ -71,6 +81,16 @@ export async function buildApp(config: Config, injected?: Partial<Deps>) {
     origin: config.WEB_ORIGIN.split(",").map((o) => o.trim()),
     methods: ["GET", "POST", "DELETE"],
     exposedHeaders: ["x-request-id"],
+  });
+  await app.register(rateLimit, {
+    max: config.RATE_LIMIT_PER_MINUTE,
+    timeWindow: "1 minute",
+    // Thrown into the error handler below, which renders the ApiError shape.
+    errorResponseBuilder: (_req, ctx) => ({
+      statusCode: 429,
+      code: "rate_limited",
+      message: `Too many requests. Wait ${Math.ceil(ctx.ttl / 1000)}s and try again.`,
+    }),
   });
   await app.register(multipart);
   await app.register(healthRoutes, { deps, config });

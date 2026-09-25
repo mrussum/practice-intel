@@ -4,6 +4,7 @@ import { loadConfig, type Config } from "../src/config.js";
 import type { Deps } from "../src/deps.js";
 import { fakeEmbedder } from "../src/lib/embeddings.js";
 import { fakeLlm } from "../src/lib/fake-llm.js";
+import { noopTracer } from "../src/lib/tracing.js";
 import { memoryStore } from "../src/store/memory.js";
 
 export function testConfig(overrides: Record<string, string> = {}): Config {
@@ -11,7 +12,7 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
 }
 
 export function testDeps(overrides: Partial<Deps> = {}): Deps {
-  return { store: memoryStore(), llm: fakeLlm(), embedder: fakeEmbedder(), ...overrides };
+  return { store: memoryStore(), llm: fakeLlm(), embedder: fakeEmbedder(), tracer: noopTracer(), ...overrides };
 }
 
 export async function testApp(overrides: Partial<Deps> = {}, config = testConfig()) {

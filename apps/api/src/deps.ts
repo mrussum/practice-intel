@@ -1,6 +1,7 @@
 import type { Config } from "./config.js";
 import { createEmbedder, type Embedder } from "./lib/embeddings.js";
 import { createLlm, type LLM } from "./lib/llm.js";
+import { createTracer, type Tracer } from "./lib/tracing.js";
 import { memoryStore } from "./store/memory.js";
 import { postgresStore } from "./store/postgres.js";
 import type { Store } from "./store/types.js";
@@ -10,6 +11,7 @@ export interface Deps {
   store: Store;
   llm: LLM;
   embedder: Embedder;
+  tracer: Tracer;
 }
 
 export async function createDeps(config: Config): Promise<Deps> {
@@ -17,5 +19,6 @@ export async function createDeps(config: Config): Promise<Deps> {
     store: config.DATABASE_URL ? postgresStore(config.DATABASE_URL) : memoryStore(),
     llm: await createLlm(config),
     embedder: createEmbedder(config),
+    tracer: createTracer(config),
   };
 }
