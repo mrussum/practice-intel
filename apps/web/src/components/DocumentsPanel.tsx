@@ -82,6 +82,7 @@ export function DocumentsPanel({
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["documents"] });
     void queryClient.invalidateQueries({ queryKey: ["fit"] });
+    void queryClient.invalidateQueries({ queryKey: ["document"] });
   };
 
   const upload = async (kind: DocumentKind, files: File[]) => {

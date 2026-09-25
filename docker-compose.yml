@@ -14,9 +14,13 @@ services:
 
   api:
     build: { context: ., dockerfile: apps/api/Dockerfile }
-    env_file: .env
+    # Optional: without a .env the app runs in demo mode (deterministic fake AI).
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgres://career:career@db:5432/career
+      WEB_ORIGIN: http://localhost:8080,http://localhost:5173
     ports: ["3001:3001"]
     depends_on:
       db: { condition: service_healthy }
@@ -27,7 +31,22 @@ services:
       dockerfile: apps/web/Dockerfile
       args: { VITE_API_URL: http://localhost:3001 }
     ports: ["8080:80"]
-    depends_on: [api]
+    depends_on:
+      api: { condition: service_healthy }
+
+  # Loads the fictional fixtures: docker compose --profile seed run --rm seed
+  seed:
+    profiles: [seed]
+    image: curlimages/curl:8.10.1
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./evals/fixtures:/fixtures:ro
+    environment:
+      API_URL: http://api:3001
+      FIXTURES_DIR: /fixtures
+    entrypoint: ["sh", "/scripts/seed.sh"]
+    depends_on:
+      api: { condition: service_healthy }
 
 volumes:
   dbdata:

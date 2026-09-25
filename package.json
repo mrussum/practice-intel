@@ -9,7 +9,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "eval": "pnpm --filter @career-intel/evals eval",
-    "seed": "pnpm --filter @career-intel/api seed",
+    "seed": "sh scripts/seed.sh",
     "test:e2e": "pnpm --filter @career-intel/web test:e2e"
   },
   "devDependencies": {
