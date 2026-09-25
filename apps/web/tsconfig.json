@@ -8,11 +8,14 @@
       "DOM.Iterable"
     ],
     "types": [
-      "vite/client"
+      "vite/client",
+      "node"
     ]
   },
   "include": [
     "src",
-    "test"
+    "test",
+    "e2e",
+    "playwright.config.ts"
   ]
 }

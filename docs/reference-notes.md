@@ -197,3 +197,37 @@ adding jsdom or Testing Library.
 - Chat history lives in client state for the page session. The server
   persists messages for context, but there's no "reload a past conversation"
   view (out of scope).
+
+## Phase 5 — Quality (plan)
+
+**Files**
+- `evals/fixtures/`: one fictional resume (Jordan Ellis, backend engineer)
+  and three fictional JDs, uploaded in this order so the labels are stable:
+  Job #1 Ledgerline backend (strong fit), Job #2 Northwind platform (partial:
+  Kubernetes/Go/observability missing), Job #3 Lumen ML (weak).
+- `evals/golden.jsonl`: 20 cases covering every intent, metadata filtering
+  (by label, company and title), not-found, off-topic, two injection attempts
+  and cross-job comparison. Fields: `expectIntent`, `expectDocs` (must be in
+  the retrieved top-k), `forbidDocs` (must not be, which checks the filter),
+  `mustMention` / `mustNotMention`.
+- `evals/run.ts`: ingests the fixtures into an in-memory store, runs each case
+  through the same `answerQuestion()` pipeline the API uses, and scores
+  intent accuracy, retrieval hit@k, answer checks, and citation
+  groundedness (the share of `[Cn]` markers in the raw answer that point at
+  chunks in the context, measured before the server drops invalid ones).
+  `--judge` adds a Haiku faithfulness score. It prints a table, writes
+  `evals/report.md` and exits non-zero below thresholds. Fake mode is the
+  default (CI). `--real` uses the configured models and keys.
+- `apps/web/e2e/`: one Playwright test that starts the API (fake AI,
+  in-memory) and the web dev server, uploads the fixtures, asks a gap
+  question, clicks a citation and checks the highlighted evidence.
+- CI: an `evals` job (fake mode) and an `e2e` job.
+
+**Assumptions**
+- Evals always use the in-memory store, so they never touch a developer's
+  database and need no Docker in CI. The trade-off: they don't exercise
+  Postgres full-text ranking. That's covered by the testcontainers
+  integration test, and the README says so.
+- In fake mode the answer checks mostly test plumbing (routing, filtering,
+  citation handling, refusal paths). Answer quality is only measured by
+  `--real` (optionally with `--judge`). The report states which mode ran.

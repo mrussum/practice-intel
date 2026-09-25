@@ -8,12 +8,16 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "eval": "pnpm --filter @career-intel/api eval"
+    "eval": "pnpm --filter @career-intel/evals eval",
+    "seed": "pnpm --filter @career-intel/api seed",
+    "test:e2e": "pnpm --filter @career-intel/web test:e2e"
   },
   "devDependencies": {
     "typescript": "^5.6.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

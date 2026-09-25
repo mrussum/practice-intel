@@ -194,3 +194,18 @@ describe("answerQuestion", () => {
     close = undefined;
   });
 });
+
+describe("off-topic override", () => {
+  it("treats a question naming an uploaded job's company as on-topic", async () => {
+    const base = fakeLlm();
+    const alwaysOffTopic: LLM = {
+      ...base,
+      complete: async (req) => (req.task === "route" ? { text: '{"intent":"off_topic"}', usage: (await base.complete(req)).usage } : base.complete(req)),
+    };
+    const { app } = await seeded({ llm: alwaysOffTopic });
+    const { events } = await ask(app, "What does Northwind expect from engineers?");
+    expect(events[0]).toEqual({ type: "intent", intent: "general" });
+    const { events: other } = await ask(app, "What is the capital of France?");
+    expect(other[0]).toEqual({ type: "intent", intent: "off_topic" });
+  });
+});

@@ -71,8 +71,12 @@ export async function* answerQuestion(
   const session = await deps.store.getOrCreateSession(req.sessionId);
   const [docs, messages] = await Promise.all([deps.store.listDocuments(), deps.store.listMessages(req.sessionId)]);
 
-  const { intent, usages: routeUsage } = await step("route", () => routeIntent(deps.llm, req.message, docs.map((d) => d.label)));
-  usage(routeUsage);
+  const mentioned = resolveMentions(req.message, docs);
+  const routed = await step("route", () => routeIntent(deps.llm, req.message, docs.map((d) => d.label)));
+  usage(routed.usages);
+  // A question that names one of the user's jobs is about their documents,
+  // whatever the classifier thought ("What benefits does Ledgerline offer?").
+  const intent: Intent = routed.intent === "off_topic" && mentioned.length ? "general" : routed.intent;
   yield { type: "intent", intent };
 
   const persist = async (answer: string, citations: ChatEvent & { type: "citations" }) => {
@@ -94,7 +98,6 @@ export async function* answerQuestion(
   const strategy = STRATEGIES[intent];
   const resume = docs.find((d) => d.kind === "resume");
   const jobs = docs.filter((d) => d.kind === "job");
-  const mentioned = resolveMentions(req.message, docs);
   const targets = mentioned.length ? jobs.filter((j) => mentioned.includes(j.id)) : jobs;
 
   const retrieved = await step("retrieve", async () => {

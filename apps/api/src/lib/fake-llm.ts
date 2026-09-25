@@ -17,7 +17,7 @@ export const NOT_FOUND = "not found in your documents";
 // ---- routing -----------------------------------------------------------------
 
 const CAREER_TERMS =
-  /\b(job|jobs|role|roles|resume|cv|skill|skills|experience|fit|gap|gaps|missing|interview|compare|position|qualif\w*|requirement\w*|match|career|apply|application|strength\w*|weakness\w*|candidate|background|work|worked|working|projects?|education|degree|certif\w*|technolog\w*|tools?|stack|prepare|hiring|salary|responsibilit\w*|company|companies|employer)\b|job\s*#?\d/i;
+  /\b(job|jobs|role|roles|resume|cv|skill|skills|experience|fit|gap|gaps|missing|interview|compare|position|qualif\w*|requirement\w*|match|career|apply|application|strength\w*|weakness\w*|candidate|background|work|worked|working|projects?|education|degree|certif\w*|technolog\w*|tools?|stack|prepare|hiring|salary|responsibilit\w*|company|companies|employer|benefits|perks|team|remote|hybrid)\b|\bmy\b|\b(did|do|have|was|am) i\b|job\s*#?\d/i;
 
 export function fakeRoute(message: string): Intent {
   const m = message.toLowerCase();
@@ -192,6 +192,23 @@ export function fakeAnswer(input: TaskInputs["answer"]): string {
     return `${heading}\n${lines.join("\n")}`;
   }
 
+  if (intent === "interview_prep") {
+    const probes = context.filter((c) => c.section === "requirements").slice(0, 2);
+    const stories = context
+      .filter((c) => c.label === "Resume")
+      .map((c, i) => ({ c, i, score: relevance(question, `${c.section} ${c.text}`) }))
+      .sort((a, b) => b.score - a.score || a.i - b.i)
+      .slice(0, 2)
+      .map(({ c }) => c);
+    if (probes.length + stories.length > 0) {
+      return [
+        "Areas to prepare, based on your documents:",
+        ...probes.map((c) => `- Expect questions on: ${truncate(c.text, 160)} [${c.ref}]`),
+        ...stories.map((c) => `- Evidence to draw on (${c.section}): ${truncate(c.text, 160)} [${c.ref}]`),
+      ].join("\n");
+    }
+  }
+
   const scored = context
     .map((c, i) => ({ c, i, score: relevance(question, `${c.section} ${c.text}`) }))
     .filter((x) => x.score > 0)
@@ -199,8 +216,7 @@ export function fakeAnswer(input: TaskInputs["answer"]): string {
     .slice(0, 3);
   if (scored.length === 0) return `I checked your documents and that was ${NOT_FOUND}.`;
 
-  const intro = intent === "interview_prep" ? "Areas to prepare, based on your documents:" : "Here is what your documents say:";
-  return `${intro}\n${scored.map(({ c }) => `- ${c.label} (${c.section}): ${truncate(c.text, 160)} [${c.ref}]`).join("\n")}`;
+  return `Here is what your documents say:\n${scored.map(({ c }) => `- ${c.label} (${c.section}): ${truncate(c.text, 160)} [${c.ref}]`).join("\n")}`;
 }
 
 // ---- the fake LLM ------------------------------------------------------------

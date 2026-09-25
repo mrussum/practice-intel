@@ -97,6 +97,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@5.4.21(@types/node@22.20.4)(lightningcss@1.32.0))
+      '@types/node':
+        specifier: ^22.20.4
+        version: 22.20.4
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.31
@@ -115,6 +118,28 @@ importers:
       vite:
         specifier: ^5.4.11
         version: 5.4.21(@types/node@22.20.4)(lightningcss@1.32.0)
+      vitest:
+        specifier: ^2.1.5
+        version: 2.1.9(@types/node@22.20.4)(lightningcss@1.32.0)
+
+  evals:
+    dependencies:
+      '@career-intel/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.4
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.15
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
       vitest:
         specifier: ^2.1.5
         version: 2.1.9(@types/node@22.20.4)(lightningcss@1.32.0)

@@ -17,20 +17,44 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # Includes the Postgres integration test (testcontainers uses the runner's Docker).
       - run: pnpm test
       - run: pnpm build
 
-  # Enable once the pipeline exists (day 6). Runs the golden set against
-  # the real models, so it needs the API key secret and costs a few pence.
-  # evals:
-  #   needs: check
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: pnpm/action-setup@v4
-  #     - uses: actions/setup-node@v4
-  #       with: { node-version: 22, cache: pnpm }
-  #     - run: pnpm install --frozen-lockfile
-  #     - run: pnpm eval
+  # Golden-set evals in fake mode: deterministic, no API keys, no cost.
+  # Gates on routing, retrieval filtering, citation groundedness and refusals.
+  # Real-model runs are manual: `pnpm eval --real --judge` with keys set.
+  evals:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm eval
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report
+          path: evals/report.md
+
+  e2e:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @career-intel/web exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
