@@ -343,7 +343,9 @@ question and opened a highlighted citation.
   dependencies (currently none) and reports dev-dependency advisories
   without failing. Dependabot opens weekly grouped PRs for npm, GitHub
   Actions and base images.
-- Open item for the owner: the dev tooling pinned by the scaffold (Vite 5,
-  Vitest 2, drizzle-kit's esbuild) has 8 advisories (1 critical, 1 high),
-  all in local dev servers and none in shipped images. Fixing them needs
-  major upgrades (Vite ≥ 6.4.3, Vitest ≥ 4.1.11).
+- Dev tooling upgraded to clear 8 advisories (1 critical, 1 high): Vite
+  5 → 8, Vitest 2 → 5, @vitejs/plugin-react 4 → 6. drizzle-kit's latest
+  release still depends on an old esbuild through `@esbuild-kit/core-utils`,
+  so a pnpm override pins that path to esbuild ^0.25. `drizzle-kit generate`
+  still works with it. Remove the override once drizzle-kit drops
+  `@esbuild-kit`. `pnpm audit` now reports no known vulnerabilities.
