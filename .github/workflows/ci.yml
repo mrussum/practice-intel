@@ -21,6 +21,20 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+  # Dependency audit. Gates on high/critical advisories in production
+  # dependencies (what ships in the images); dev-tool advisories are reported
+  # in the log without failing the build, and Dependabot proposes upgrades.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm audit --prod --audit-level high
+      - name: Report dev-dependency advisories (non-blocking)
+        run: pnpm audit || true
+
   # Golden-set evals in fake mode: deterministic, no API keys, no cost.
   # Gates on routing, retrieval filtering, citation groundedness and refusals.
   # Real-model runs are manual: `pnpm eval --real --judge` with keys set.

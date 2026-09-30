@@ -330,3 +330,20 @@ question and opened a highlighted citation.
    static-render only. Chat state transitions (stop, retry, error) are
    covered by one e2e path rather than unit tests, and there's no
    ESLint/Prettier config beyond strict `tsc`.
+
+## Follow-up — security hardening
+
+- `apps/web/nginx.conf.template`: CSP (self only, plus `connect-src` for
+  `API_ORIGIN`), `nosniff`, `X-Frame-Options: DENY`, `no-referrer`,
+  Permissions-Policy, COOP, and a hidden nginx version. Checked against the
+  built image: the full UI flow runs with no CSP violations, and an
+  outbound fetch to another host and an injected inline script are both
+  refused.
+- CI `audit` job: fails on high/critical advisories in production
+  dependencies (currently none) and reports dev-dependency advisories
+  without failing. Dependabot opens weekly grouped PRs for npm, GitHub
+  Actions and base images.
+- Open item for the owner: the dev tooling pinned by the scaffold (Vite 5,
+  Vitest 2, drizzle-kit's esbuild) has 8 advisories (1 critical, 1 high),
+  all in local dev servers and none in shipped images. Fixing them needs
+  major upgrades (Vite ≥ 6.4.3, Vitest ≥ 4.1.11).
