@@ -13,7 +13,7 @@ ARG VITE_API_URL=http://localhost:3001
 ENV VITE_API_URL=$VITE_API_URL
 RUN pnpm --filter @career-intel/web build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 # The origin the browser may call (CSP connect-src). Match it to VITE_API_URL.
 ENV API_ORIGIN=http://localhost:3001
 COPY apps/web/nginx.conf.template /etc/nginx/templates/default.conf.template
