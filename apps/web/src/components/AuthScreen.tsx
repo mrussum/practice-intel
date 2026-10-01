@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { Me } from "@career-intel/shared";
 import { api, RequestError } from "../lib/api";
+import { BrandMark } from "./BrandMark";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader } from "./ui/card";
@@ -34,12 +35,16 @@ export function AuthScreen({ onAuthed, offline }: { onAuthed: (me: Me) => void; 
   };
 
   return (
-    <main className="flex min-h-full items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
+    <main className="flex min-h-full items-center justify-center bg-gradient-to-br from-indigo-100 via-slate-50 to-sky-100 p-4">
+      <Card className="w-full max-w-sm overflow-hidden shadow-lg">
+        <div aria-hidden className="h-1.5 bg-gradient-to-r from-brand-from via-indigo-500 to-brand-to" />
         <CardHeader className="gap-3">
-          <div>
-            <h1 className="text-lg font-semibold">Career Intel</h1>
-            <p className="text-sm text-muted-foreground">Grounded answers about your resume and target jobs.</p>
+          <div className="flex items-center gap-3">
+            <BrandMark className="h-10 w-10 text-base" />
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight text-indigo-950">Career Intel</h1>
+              <p className="text-sm text-muted-foreground">Grounded answers about your resume and target jobs.</p>
+            </div>
           </div>
           <Tabs
             idPrefix="auth"

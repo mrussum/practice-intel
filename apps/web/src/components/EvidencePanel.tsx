@@ -34,8 +34,11 @@ export function EvidencePanel({ target, onClose }: { target: EvidenceTarget | nu
 
   return (
     <section aria-labelledby="evidence-heading" className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border p-4">
-        <h2 id="evidence-heading" className="text-sm font-semibold">Evidence</h2>
+      <div className="flex items-center justify-between border-b border-amber-100 bg-gradient-to-r from-amber-50 to-white p-4">
+        <h2 id="evidence-heading" className="flex items-center gap-2 text-sm font-semibold text-amber-950">
+          <span aria-hidden className="h-2 w-2 rounded-full bg-amber-500" />
+          Evidence
+        </h2>
         {onClose ? (
           <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close evidence panel">Close</Button>
         ) : null}
@@ -50,7 +53,7 @@ export function EvidencePanel({ target, onClose }: { target: EvidenceTarget | nu
         ) : doc.data ? (
           <article aria-label={`${doc.data.label}: ${doc.data.title}`} className="space-y-3">
             <header className="space-y-1">
-              <Badge variant={doc.data.kind === "resume" ? "primary" : "default"}>{doc.data.label}</Badge>
+              <Badge variant={doc.data.kind === "resume" ? "primary" : "sky"}>{doc.data.label}</Badge>
               <p className="text-sm font-semibold">{doc.data.title}</p>
               <p className="text-xs text-muted-foreground">{doc.data.filename}</p>
             </header>
@@ -68,7 +71,7 @@ export function EvidencePanel({ target, onClose }: { target: EvidenceTarget | nu
                   data-testid={active ? "highlighted-chunk" : undefined}
                   className={cn(
                     "rounded-md border p-2 text-sm whitespace-pre-wrap outline-none",
-                    active ? "border-partial/50 bg-highlight ring-2 ring-partial/40" : "border-transparent text-muted-foreground",
+                    active ? "border-amber-300 border-l-4 border-l-amber-500 bg-highlight text-foreground shadow-sm" : "border-transparent text-muted-foreground",
                   )}
                 >
                   <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{sectionLabel(c.section)}</p>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import type { Citation, Intent } from "@career-intel/shared";
 import { streamChat } from "../lib/sse";
 import { cn } from "../lib/cn";
+import { INTENT_STYLE } from "../lib/intent-style";
 import { AnswerText, SourceList } from "./AnswerText";
 import { Alert } from "./ui/alert";
 import { Badge } from "./ui/badge";
@@ -17,14 +18,6 @@ interface Message {
   error?: string;
 }
 
-const INTENT_LABEL: Record<Intent, string> = {
-  fit: "Fit",
-  gaps: "Skill gaps",
-  compare: "Compare",
-  interview_prep: "Interview prep",
-  general: "General",
-  off_topic: "Off topic",
-};
 
 export function suggestionsFor(jobLabels: string[]): { intent: Intent; questions: string[] }[] {
   const first = jobLabels[0] ?? "Job #1";
@@ -138,16 +131,19 @@ export function ChatPanel({
 
         {messages.length === 0 ? (
           <div className="space-y-4">
-            <div>
-              <h2 className="text-base font-semibold">Ask about your fit</h2>
-              <p className="text-sm text-muted-foreground">Answers are grounded in your documents, with numbered citations you can click to see the source.</p>
+            <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4">
+              <h2 className="text-base font-semibold text-indigo-950">Ask about your fit</h2>
+              <p className="text-sm text-slate-600">Answers are grounded in your documents, with numbered citations you can click to see the source.</p>
             </div>
             {groups.map((g) => (
               <div key={g.intent}>
-                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{INTENT_LABEL[g.intent]}</p>
+                <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <span aria-hidden className={cn("h-2 w-2 rounded-full", INTENT_STYLE[g.intent].dot)} />
+                  {INTENT_STYLE[g.intent].label}
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {g.questions.map((q) => (
-                    <Button key={q} variant="outline" size="sm" className="h-auto py-1.5 text-left whitespace-normal" onClick={() => void send(q)}>
+                    <Button key={q} variant="outline" size="sm" className={cn("h-auto py-1.5 text-left whitespace-normal", INTENT_STYLE[g.intent].chip)} onClick={() => void send(q)}>
                       {q}
                     </Button>
                   ))}
@@ -160,11 +156,17 @@ export function ChatPanel({
             {messages.map((m) => (
               <li key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
                 {m.role === "user" ? (
-                  <div className="max-w-[85%] rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground">{m.text}</div>
+                  <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-gradient-to-br from-indigo-600 to-sky-600 px-3.5 py-2 text-sm text-white shadow-sm">{m.text}</div>
                 ) : (
-                  <article aria-label="Assistant answer" className="w-full max-w-[95%] rounded-lg border border-border bg-card px-3 py-2">
+                  <article
+                    aria-label="Assistant answer"
+                    className={cn(
+                      "w-full max-w-[95%] rounded-xl rounded-tl-sm border border-l-4 border-border bg-card px-3.5 py-2.5 shadow-sm",
+                      m.intent ? INTENT_STYLE[m.intent].border : "border-l-indigo-300",
+                    )}
+                  >
                     <div className="mb-1 flex items-center gap-2">
-                      {m.intent ? <Badge variant="primary">{INTENT_LABEL[m.intent]}</Badge> : null}
+                      {m.intent ? <Badge variant={INTENT_STYLE[m.intent].badge}>{INTENT_STYLE[m.intent].label}</Badge> : null}
                       {m.status === "streaming" ? <span className="text-xs text-muted-foreground">{m.text ? "Writing…" : "Reading your documents…"}</span> : null}
                       {m.status === "stopped" ? <span className="text-xs text-muted-foreground">Stopped</span> : null}
                     </div>
@@ -185,7 +187,13 @@ export function ChatPanel({
         {!streaming && followUps.length > 0 ? (
           <div className="flex flex-wrap gap-2" aria-label="Suggested follow-ups">
             {followUps.map((q) => (
-              <Button key={q} variant="outline" size="sm" className="h-auto py-1 text-xs whitespace-normal" onClick={() => void send(q)}>
+              <Button
+                key={q}
+                variant="outline"
+                size="sm"
+                className={cn("h-auto py-1 text-xs whitespace-normal", lastIntent ? INTENT_STYLE[lastIntent].chip : undefined)}
+                onClick={() => void send(q)}
+              >
                 {q}
               </Button>
             ))}
@@ -203,7 +211,7 @@ export function ChatPanel({
           onKeyDown={onKeyDown}
           rows={2}
           placeholder="Ask about fit, gaps, or interview prep… (Enter to send, Shift+Enter for a new line)"
-          className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm transition-colors focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

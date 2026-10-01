@@ -59,7 +59,7 @@ export function Tabs<T extends string>({
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
               "rounded px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              selected ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              selected ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
             )}
           >
             {item.label}
