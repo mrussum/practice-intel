@@ -53,16 +53,16 @@ export function CompareView({ jobs, resume }: { jobs: DocumentSummary[]; resume?
   return (
     <div className="space-y-3">
       {jobs.length === 1 ? <Alert>Upload another job description to make the comparison useful.</Alert> : null}
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="w-full min-w-[520px] border-collapse text-sm">
           <caption className="sr-only">Key requirements across jobs, with how well your resume covers each</caption>
           <thead>
-            <tr className="border-b border-border bg-muted/50">
-              <th scope="col" className="p-2 text-left font-medium">Requirement</th>
+            <tr className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-sky-50">
+              <th scope="col" className="p-2.5 text-left font-semibold text-indigo-950">Requirement</th>
               {jobs.map((j, i) => {
                 const s = summarizeFit(fits[i]!.rows);
                 return (
-                  <th key={j.id} scope="col" className="p-2 text-left font-medium">
+                  <th key={j.id} scope="col" className="p-2.5 text-left font-semibold text-sky-900">
                     <div>{j.label}</div>
                     <div className="max-w-[180px] truncate text-xs font-normal text-muted-foreground" title={j.title}>{j.title}</div>
                     <div className="text-xs font-normal text-muted-foreground">{s.mustMet}/{s.must} must-haves met</div>
@@ -73,8 +73,8 @@ export function CompareView({ jobs, resume }: { jobs: DocumentSummary[]; resume?
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.skill} className="border-b border-border last:border-0">
-                <th scope="row" className="p-2 text-left font-normal">{r.skill}</th>
+              <tr key={r.skill} className="border-b border-border last:border-0 even:bg-slate-50/70 hover:bg-indigo-50/40">
+                <th scope="row" className="p-2.5 text-left font-medium text-slate-800">{r.skill}</th>
                 {jobs.map((j) => {
                   const cell = r.cells.get(j.id);
                   return (

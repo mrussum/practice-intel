@@ -3,10 +3,17 @@ import { cn } from "../../lib/cn";
 
 const variants = {
   default: "bg-muted text-foreground border-border",
-  primary: "bg-primary/10 text-primary border-primary/20",
-  met: "bg-met/10 text-met border-met/30",
-  partial: "bg-partial/10 text-partial border-partial/30",
-  missing: "bg-missing/10 text-missing border-missing/30",
+  primary: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  sky: "bg-sky-50 text-sky-700 border-sky-200",
+  violet: "bg-violet-50 text-violet-700 border-violet-200",
+  amber: "bg-amber-50 text-amber-800 border-amber-200",
+  emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  slate: "bg-slate-100 text-slate-700 border-slate-200",
+  // For badges on the dark brand header.
+  onBrand: "bg-white/15 text-white border-white/25",
+  met: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  partial: "bg-amber-50 text-amber-800 border-amber-200",
+  missing: "bg-rose-50 text-rose-700 border-rose-200",
 } as const;
 
 export type BadgeVariant = keyof typeof variants;

@@ -4,6 +4,7 @@ import type { Citation, Me } from "@career-intel/shared";
 import { api, RequestError } from "./lib/api";
 import { cn } from "./lib/cn";
 import { AuthScreen } from "./components/AuthScreen";
+import { BrandMark } from "./components/BrandMark";
 import { ChatPanel } from "./components/ChatPanel";
 import { CompareView } from "./components/CompareView";
 import { DocumentsPanel } from "./components/DocumentsPanel";
@@ -149,27 +150,32 @@ function Workspace({ me, onLogout }: { me: Me; onLogout: () => Promise<void> }) 
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-base font-semibold">Career Intel</h1>
-          <p className="hidden text-xs text-muted-foreground md:block">Grounded answers about your resume and target jobs</p>
+      <header className="flex items-center justify-between bg-gradient-to-r from-brand-from to-brand-to px-4 py-2.5 text-white shadow-sm">
+        <div className="flex items-center gap-3">
+          <BrandMark inverted />
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-base font-semibold tracking-tight">Career Intel</h1>
+            <p className="hidden text-xs text-indigo-100 md:block">Grounded answers about your resume and target jobs</p>
+          </div>
         </div>
         <div className="flex items-center gap-2" aria-live="polite">
           {ready.error ? (
-            <Badge variant="missing">API offline</Badge>
+            <Badge variant="missing" className="border-transparent">API offline</Badge>
           ) : ready.data?.ai === "fake" || ready.data?.embeddings === "fake" ? (
-            <Badge variant="partial" title="No API keys configured: deterministic stand-ins are answering. Add keys to .env for real answers.">
+            <Badge variant="amber" className="border-transparent" title="No API keys configured: deterministic stand-ins are answering. Add keys to .env for real answers.">
               Demo mode
             </Badge>
           ) : null}
-          {ready.data?.store === "memory" ? <Badge title="No DATABASE_URL: data is lost on restart.">In-memory store</Badge> : null}
-          <span className="hidden max-w-[200px] truncate text-xs text-muted-foreground sm:inline" title={me.email}>{me.email}</span>
-          <Button variant="ghost" size="sm" onClick={() => void onLogout()}>Sign out</Button>
+          {ready.data?.store === "memory" ? <Badge variant="onBrand" title="No DATABASE_URL: data is lost on restart.">In-memory store</Badge> : null}
+          <span className="hidden max-w-[200px] truncate text-xs text-indigo-100 sm:inline" title={me.email}>{me.email}</span>
+          <Button variant="ghost" size="sm" className="text-white hover:bg-white/15 focus-visible:ring-white focus-visible:ring-offset-0" onClick={() => void onLogout()}>
+            Sign out
+          </Button>
         </div>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_380px]">
-        <aside className="min-h-0 border-b border-border bg-background md:border-r md:border-b-0">
+        <aside className="min-h-0 border-b border-border bg-gradient-to-b from-indigo-50/70 to-background md:border-r md:border-b-0">
           <DocumentsPanel
             documents={docs}
             loading={documents.isLoading}
@@ -182,7 +188,7 @@ function Workspace({ me, onLogout }: { me: Me; onLogout: () => Promise<void> }) 
         </aside>
 
         <main className="flex min-h-0 min-w-0 flex-col">
-          <div className="border-b border-border px-4 py-2">
+          <div className="border-b border-border bg-card px-4 py-2">
             <Tabs
               idPrefix="view"
               label="Views"

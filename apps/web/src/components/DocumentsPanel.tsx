@@ -42,9 +42,14 @@ function DropZone({ kind, multiple, onFiles }: { kind: DocumentKind; multiple: b
       }}
       onDragLeave={() => setOver(false)}
       onDrop={onDrop}
-      className={cn("rounded-lg border border-dashed p-3 text-center transition-colors", over ? "border-primary bg-primary/5" : "border-border")}
+      className={cn(
+        "rounded-xl border-2 border-dashed p-3 text-center transition-colors",
+        kind === "resume"
+          ? over ? "border-indigo-500 bg-indigo-100/70" : "border-indigo-200 bg-indigo-50/60"
+          : over ? "border-sky-500 bg-sky-100/70" : "border-sky-200 bg-sky-50/60",
+      )}
     >
-      <p className="text-sm font-medium">{label}</p>
+      <p className={cn("text-sm font-semibold", kind === "resume" ? "text-indigo-900" : "text-sky-900")}>{label}</p>
       <p className="mb-2 text-xs text-muted-foreground">Drop {multiple ? "files" : "a file"} or browse · PDF, DOCX, TXT, MD · 5MB</p>
       <Button variant="outline" size="sm" onClick={() => input.current?.click()} aria-label={`Upload ${label.toLowerCase()}`}>
         Choose {multiple ? "files" : "file"}
@@ -112,9 +117,15 @@ export function DocumentsPanel({
   const pending = uploads.filter((u) => !u.error);
 
   const row = (d: DocumentSummary) => (
-    <li key={d.id} className="group rounded-md border border-border bg-card p-2">
+    <li
+      key={d.id}
+      className={cn(
+        "group rounded-lg border border-border border-l-4 bg-card p-2 shadow-sm transition-shadow hover:shadow",
+        d.kind === "resume" ? "border-l-indigo-500" : "border-l-sky-500",
+      )}
+    >
       <div className="flex items-start gap-2">
-        <Badge variant={d.kind === "resume" ? "primary" : "default"}>{d.label}</Badge>
+        <Badge variant={d.kind === "resume" ? "primary" : "sky"}>{d.label}</Badge>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium" title={d.title}>{d.title}</p>
           <p className="truncate text-xs text-muted-foreground" title={d.filename}>
@@ -134,7 +145,7 @@ export function DocumentsPanel({
         </Button>
       </div>
       {d.kind === "job" ? (
-        <Button variant="ghost" size="sm" className="mt-1 h-7 px-2 text-primary" onClick={() => onOpenFit(d.id)}>
+        <Button variant="ghost" size="sm" className="mt-1 h-7 px-2 text-sky-700 hover:bg-sky-50" onClick={() => onOpenFit(d.id)}>
           View fit matrix →
         </Button>
       ) : null}
@@ -143,7 +154,7 @@ export function DocumentsPanel({
 
   return (
     <section aria-labelledby="documents-heading" className="flex h-full flex-col gap-3 overflow-y-auto p-4">
-      <h2 id="documents-heading" className="text-sm font-semibold">Documents</h2>
+      <h2 id="documents-heading" className="text-sm font-semibold text-indigo-950">Documents</h2>
       <DropZone kind="resume" multiple={false} onFiles={(f) => void upload("resume", f)} />
       <DropZone kind="job" multiple onFiles={(f) => void upload("job", f)} />
 
@@ -175,11 +186,11 @@ export function DocumentsPanel({
       ) : (
         <div className="space-y-3">
           <div>
-            <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Resume</h3>
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">Resume</h3>
             {resume ? <ul>{row(resume)}</ul> : <p className="text-xs text-muted-foreground">No resume yet.</p>}
           </div>
           <div>
-            <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Jobs ({jobs.length})</h3>
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-sky-700">Jobs ({jobs.length})</h3>
             {jobs.length ? <ul className="space-y-2">{jobs.map(row)}</ul> : <p className="text-xs text-muted-foreground">No job descriptions yet.</p>}
           </div>
         </div>

@@ -2,8 +2,8 @@ import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { cn } from "../../lib/cn";
 
 const variants = {
-  default: "bg-primary text-primary-foreground hover:bg-primary/90",
-  outline: "border border-border bg-card hover:bg-muted",
+  default: "bg-primary text-primary-foreground shadow-sm hover:bg-indigo-700",
+  outline: "border border-border bg-card text-slate-700 hover:bg-muted",
   ghost: "hover:bg-muted",
   destructive: "bg-destructive text-white hover:bg-destructive/90",
 } as const;
