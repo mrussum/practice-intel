@@ -43,6 +43,7 @@ export async function streamChat(req: ChatRequest, onEvent: (e: ChatEvent) => vo
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(req),
+    credentials: "include",
     signal,
   });
   if (!res.ok || !res.body) {

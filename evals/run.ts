@@ -122,13 +122,17 @@ async function main() {
   const deps: Deps = { store: memoryStore(), llm: await createLlm(config), embedder: createEmbedder(config), tracer: noopTracer() };
   const mode = `${aiMode(config)} LLM (${deps.llm.modelFor("answer")} / ${deps.llm.modelFor("fast")}), ${embeddingMode(config)} embeddings (${deps.embedder.model})`;
 
+  // Evals run as one dedicated user, exactly like a signed-in API caller.
+  const user = await deps.store.createUser("evals@example.com", "not-a-login");
+  const userId = user!.id;
+
   // Fixed upload order → stable labels: Resume, Job #1..#3.
   const fixtures = here("./fixtures/");
   const files = readdirSync(fixtures).sort();
   for (const name of [...files.filter((f) => f.startsWith("resume")), ...files.filter((f) => f.startsWith("job"))]) {
-    await ingestDocument(deps, { kind: name.startsWith("resume") ? "resume" : "job", filename: name, bytes: readFileSync(fixtures + name) });
+    await ingestDocument(deps, { userId, kind: name.startsWith("resume") ? "resume" : "job", filename: name, bytes: readFileSync(fixtures + name) });
   }
-  const labelOf = new Map((await deps.store.listDocuments()).map((d) => [d.id, d.label]));
+  const labelOf = new Map((await deps.store.listDocuments(userId)).map((d) => [d.id, d.label]));
 
   const cases = readFileSync(here("./golden.jsonl"), "utf8")
     .split("\n")
@@ -140,7 +144,7 @@ async function main() {
     let ctx: AnswerContext | undefined;
     let answer = "";
     let intent = "";
-    for await (const e of answerQuestion(deps, { historyBudgetTokens: 2000 }, { sessionId: crypto.randomUUID(), message: c.question }, { onContext: (x) => (ctx = x) })) {
+    for await (const e of answerQuestion(deps, { historyBudgetTokens: 2000 }, { userId, sessionId: crypto.randomUUID(), message: c.question }, { onContext: (x) => (ctx = x) })) {
       if (e.type === "intent") intent = e.intent;
       if (e.type === "token") answer += e.text;
       if (e.type === "error") answer += `[error: ${e.message}]`;

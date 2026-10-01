@@ -1,4 +1,5 @@
 import Fastify, { type FastifyError } from "fastify";
+import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
@@ -9,6 +10,7 @@ import { AiProviderError, HttpError, safeErrorForLog } from "./lib/errors.js";
 import { LlmError } from "./lib/llm.js";
 import { ParseError } from "./lib/parse.js";
 import { IngestError } from "./services/ingest.js";
+import { authenticate, authRoutes } from "./routes/auth.js";
 import { chatRoutes } from "./routes/chat.js";
 import { documentRoutes } from "./routes/documents.js";
 import { healthRoutes } from "./routes/health.js";
@@ -77,11 +79,27 @@ export async function buildApp(
     return reply.code(status).send(body);
   });
 
+  const allowedOrigins = config.WEB_ORIGIN.split(",").map((o) => o.trim());
   await app.register(cors, {
-    origin: config.WEB_ORIGIN.split(",").map((o) => o.trim()),
+    origin: allowedOrigins,
+    credentials: true, // the session cookie travels with API calls from the web app
     methods: ["GET", "POST", "DELETE"],
     exposedHeaders: ["x-request-id"],
   });
+  await app.register(cookie);
+
+  // CSRF defence alongside SameSite=Lax: a state-changing request carrying an
+  // Origin must come from the web app. Requests without Origin (curl, server
+  // to server) carry no browser cookies unless deliberately given one.
+  app.decorateRequest("user", null);
+  app.addHook("onRequest", async (req) => {
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return;
+    const origin = req.headers.origin;
+    if (origin && !allowedOrigins.includes(origin)) {
+      throw new HttpError(403, "forbidden_origin", "This request came from a page that isn't allowed to use this API.");
+    }
+  });
+
   await app.register(rateLimit, {
     max: config.RATE_LIMIT_PER_MINUTE,
     timeWindow: "1 minute",
@@ -94,9 +112,15 @@ export async function buildApp(
   });
   await app.register(multipart);
   await app.register(healthRoutes, { deps, config });
-  await app.register(documentRoutes, { deps, config });
-  await app.register(jobRoutes, { deps });
-  await app.register(chatRoutes, { deps, config });
+  await app.register(authRoutes, { deps, config });
+
+  // Everything below requires a signed-in user, and every query is scoped to them.
+  await app.register(async (protectedScope) => {
+    protectedScope.addHook("onRequest", authenticate(deps));
+    await protectedScope.register(documentRoutes, { deps, config });
+    await protectedScope.register(jobRoutes, { deps });
+    await protectedScope.register(chatRoutes, { deps, config });
+  });
 
   return app;
 }

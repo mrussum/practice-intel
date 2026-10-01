@@ -3,8 +3,15 @@ import { expect, test } from "@playwright/test";
 
 const fixture = (name: string) => fileURLToPath(new URL(`../../../evals/fixtures/${name}`, import.meta.url));
 
-test("upload documents, ask a gap question, open a citation's evidence", async ({ page }) => {
+test("sign up, upload documents, ask a gap question, open a citation's evidence", async ({ page }) => {
   await page.goto("/");
+
+  // Every visitor starts at the login screen; create a fresh account.
+  await page.getByRole("tab", { name: "Create account" }).click();
+  await page.getByLabel("Email").fill(`e2e-${Date.now()}@example.com`);
+  await page.getByLabel("Password").fill("e2e-password-123");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   await expect(page.getByText("Demo mode")).toBeVisible();
 
   await page.getByTestId("upload-resume").setInputFiles(fixture("resume-jordan-ellis.md"));
@@ -31,4 +38,9 @@ test("upload documents, ask a gap question, open a citation's evidence", async (
   const highlighted = evidence.getByTestId("highlighted-chunk");
   await expect(highlighted).toBeVisible();
   await expect(highlighted).toContainText("Kubernetes");
+
+  // Signing out returns to the login screen and the data is no longer reachable.
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByRole("tab", { name: "Log in" })).toBeVisible();
+  await expect(page.getByText("Job #2", { exact: true })).toHaveCount(0);
 });

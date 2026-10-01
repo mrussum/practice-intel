@@ -52,8 +52,9 @@ export function toFitRows(
 const inFlight = new Map<string, Promise<FitRow[]>>();
 
 /** Fit matrix for one job, computed once and cached until any document changes. */
-export async function getJobFit(deps: Deps, jobId: string, onUsage?: (u: LlmUsage) => void): Promise<FitRow[]> {
-  const job = await deps.store.getDocument(jobId);
+export async function getJobFit(deps: Deps, userId: string, jobId: string, onUsage?: (u: LlmUsage) => void): Promise<FitRow[]> {
+  // Ownership first: another user's job id is indistinguishable from a missing one.
+  const job = await deps.store.getDocument(userId, jobId);
   if (!job || job.kind !== "job") throw new HttpError(404, "not_found", "Job not found. It may have been deleted.");
   const cached = await deps.store.getFit(jobId);
   if (cached) return cached;
@@ -62,12 +63,12 @@ export async function getJobFit(deps: Deps, jobId: string, onUsage?: (u: LlmUsag
   if (pending) return pending;
 
   const compute = (async () => {
-    const resume = (await deps.store.listDocuments()).find((d) => d.kind === "resume");
+    const resume = (await deps.store.listDocuments(userId)).find((d) => d.kind === "resume");
     if (!resume) throw new HttpError(409, "no_resume", "Upload a resume first, then the fit matrix can be computed.");
     const profile = job.profile as JobProfile;
     if (profile.requirements.length === 0) return [];
 
-    const chunks = await deps.store.getChunks(resume.id);
+    const chunks = await deps.store.getChunks(userId, resume.id);
     const refToChunk = new Map(chunks.map((c, i) => [`R${i + 1}`, c.id]));
     const requirements = profile.requirements.map((r, i) => `${i}. [${r.priority}] ${r.text}`).join("\n");
     const resumeXml = chunks.map((c, i) => `<chunk ref="R${i + 1}" section="${c.section}">\n${escapeDocumentText(c.text)}\n</chunk>`).join("\n");

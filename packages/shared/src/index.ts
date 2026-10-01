@@ -124,3 +124,19 @@ export const ApiError = z.object({
   message: z.string(),
 });
 export type ApiError = z.infer<typeof ApiError>;
+
+// ---- Auth ------------------------------------------------------------------
+
+/** Signup and login body. Emails are normalised so "A@x.com" and "a@x.com" are one account. */
+export const Credentials = z.object({
+  email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
+  password: z.string().min(10, "Use at least 10 characters.").max(200),
+});
+export type Credentials = z.infer<typeof Credentials>;
+
+/** The signed-in user. */
+export const Me = z.object({
+  id: z.string().uuid(),
+  email: z.string(),
+});
+export type Me = z.infer<typeof Me>;

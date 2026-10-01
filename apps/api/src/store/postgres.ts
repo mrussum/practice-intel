@@ -1,7 +1,7 @@
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, lte, sql, type SQL } from "drizzle-orm";
 import type { Chunk, Citation, FitRow, JobProfile, ResumeProfile } from "@career-intel/shared";
 import { connect } from "../db/client.js";
-import { chunks, documents, fitCache, messages, sessions } from "../db/schema.js";
+import { chunks, documents, fitCache, messages, sessions, users, userSessions } from "../db/schema.js";
 import { tokenize } from "../lib/text.js";
 import type { Store, StoredDocument } from "./types.js";
 import { jobNumber } from "./types.js";
@@ -13,16 +13,22 @@ const chunkColumns = {
   text: chunks.text,
 };
 
-/** Arbitrary constant: serialises label assignment across concurrent uploads. */
-const LABEL_LOCK = 4242;
 
 export function postgresStore(url: string): Store {
   const { db, sql: client } = connect(url);
 
-  const scope = (documentIds?: string[]) =>
-    documentIds ? inArray(chunks.documentId, documentIds.length ? documentIds : ["00000000-0000-0000-0000-000000000000"]) : undefined;
+  // An empty id list must match nothing (inArray([]) is not valid SQL).
+  const scope = (documentIds: string[]) =>
+    inArray(chunks.documentId, documentIds.length ? documentIds : ["00000000-0000-0000-0000-000000000000"]);
 
-  const withCounts = async (where?: ReturnType<typeof eq>): Promise<StoredDocument[]> => {
+  const ownedBy = (userId: string, id?: string) =>
+    id ? and(eq(documents.userId, userId), eq(documents.id, id)) : eq(documents.userId, userId);
+
+  /** Fit rows depend on all of a user's documents, so any change clears that user's cache. */
+  const clearFits = (tx: Pick<typeof db, "delete" | "select">, userId: string) =>
+    tx.delete(fitCache).where(inArray(fitCache.jobId, tx.select({ id: documents.id }).from(documents).where(eq(documents.userId, userId))));
+
+  const withCounts = async (where: SQL | undefined): Promise<StoredDocument[]> => {
     const rows = await db
       .select({
         id: documents.id,
@@ -52,19 +58,58 @@ export function postgresStore(url: string): Store {
       await client.end();
     },
 
-    async insertDocument(doc) {
+    async createUser(email, passwordHash) {
+      const [row] = await db
+        .insert(users)
+        .values({ email, passwordHash })
+        .onConflictDoNothing({ target: users.email })
+        .returning({ id: users.id, email: users.email });
+      return row ?? null;
+    },
+    async findUserByEmail(email) {
+      const [row] = await db
+        .select({ id: users.id, email: users.email, passwordHash: users.passwordHash })
+        .from(users)
+        .where(eq(users.email, email));
+      return row ?? null;
+    },
+    async createAuthSession(tokenHash, userId, expiresAt) {
+      await db.insert(userSessions).values({ tokenHash, userId, expiresAt });
+    },
+    async findAuthSession(tokenHash) {
+      const [row] = await db
+        .select({ userId: users.id, email: users.email, expiresAt: userSessions.expiresAt })
+        .from(userSessions)
+        .innerJoin(users, eq(users.id, userSessions.userId))
+        .where(and(eq(userSessions.tokenHash, tokenHash), gt(userSessions.expiresAt, sql`now()`)));
+      return row ?? null;
+    },
+    async deleteAuthSession(tokenHash) {
+      await db.delete(userSessions).where(eq(userSessions.tokenHash, tokenHash));
+    },
+    async deleteExpiredAuthSessions(userId) {
+      await db.delete(userSessions).where(and(eq(userSessions.userId, userId), lte(userSessions.expiresAt, sql`now()`)));
+    },
+
+    async insertDocument(userId, doc) {
       const id = await db.transaction(async (tx) => {
-        await tx.execute(sql`select pg_advisory_xact_lock(${LABEL_LOCK})`);
+        // Serialises label assignment for this user's concurrent uploads.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
+        await clearFits(tx, userId);
         let label = "Resume";
         if (doc.kind === "resume") {
-          await tx.delete(documents).where(eq(documents.kind, "resume"));
+          await tx.delete(documents).where(and(eq(documents.userId, userId), eq(documents.kind, "resume")));
         } else {
-          const labels = await tx.select({ label: documents.label }).from(documents).where(eq(documents.kind, "job"));
+          const labels = await tx
+            .select({ label: documents.label })
+            .from(documents)
+            .where(and(eq(documents.userId, userId), eq(documents.kind, "job")));
           label = `Job #${Math.max(0, ...labels.map((l) => jobNumber(l.label))) + 1}`;
         }
         const [row] = await tx
           .insert(documents)
           .values({
+            userId,
             kind: doc.kind,
             label,
             title: doc.title,
@@ -77,23 +122,27 @@ export function postgresStore(url: string): Store {
         if (doc.chunks.length) {
           await tx.insert(chunks).values(doc.chunks.map((c, ordinal) => ({ ...c, documentId, ordinal })));
         }
-        await tx.delete(fitCache);
         return documentId;
       });
-      const [stored] = await withCounts(eq(documents.id, id));
+      const [stored] = await withCounts(ownedBy(userId, id));
       return stored!;
     },
-    listDocuments: () => withCounts(),
-    async getDocument(id) {
-      return (await withCounts(eq(documents.id, id)))[0] ?? null;
+    listDocuments: (userId) => withCounts(ownedBy(userId)),
+    async getDocument(userId, id) {
+      return (await withCounts(ownedBy(userId, id)))[0] ?? null;
     },
-    async getChunks(documentId) {
-      return db.select(chunkColumns).from(chunks).where(eq(chunks.documentId, documentId)).orderBy(asc(chunks.ordinal));
+    async getChunks(userId, documentId) {
+      return db
+        .select(chunkColumns)
+        .from(chunks)
+        .innerJoin(documents, eq(documents.id, chunks.documentId))
+        .where(and(eq(chunks.documentId, documentId), eq(documents.userId, userId)))
+        .orderBy(asc(chunks.ordinal));
     },
-    async deleteDocument(id) {
+    async deleteDocument(userId, id) {
       return db.transaction(async (tx) => {
-        const deleted = await tx.delete(documents).where(eq(documents.id, id)).returning({ id: documents.id });
-        if (deleted.length) await tx.delete(fitCache);
+        await clearFits(tx, userId);
+        const deleted = await tx.delete(documents).where(ownedBy(userId, id)).returning({ id: documents.id });
         return deleted.length > 0;
       });
     },
@@ -121,10 +170,13 @@ export function postgresStore(url: string): Store {
         .limit(limit);
     },
 
-    async getOrCreateSession(id) {
-      await db.insert(sessions).values({ id }).onConflictDoNothing();
-      const [s] = await db.select().from(sessions).where(eq(sessions.id, id));
-      return { id, summary: s!.summary, summarizedCount: s!.summarizedCount };
+    async getOrCreateSession(userId, id) {
+      await db.insert(sessions).values({ id, userId }).onConflictDoNothing();
+      const [s] = await db
+        .select()
+        .from(sessions)
+        .where(and(eq(sessions.id, id), eq(sessions.userId, userId)));
+      return s ? { id, summary: s.summary, summarizedCount: s.summarizedCount } : null;
     },
     async listMessages(sessionId) {
       const rows = await db.select().from(messages).where(eq(messages.sessionId, sessionId)).orderBy(asc(messages.createdAt), asc(messages.id));

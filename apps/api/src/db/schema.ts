@@ -16,8 +16,36 @@ export const EMBEDDING_DIM = 1024;
 
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
-export const documents = pgTable("documents", {
+export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
+  /** Stored lowercased; unique per account. */
+  email: text("email").notNull().unique(),
+  /** scrypt$N$r$p$salt$hash: parameters travel with the hash (see lib/auth.ts). */
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Login sessions. Only a SHA-256 of the cookie token is stored, so a DB leak can't be replayed. */
+export const userSessions = pgTable(
+  "user_sessions",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("user_sessions_user_idx").on(t.userId)],
+);
+
+export const documents = pgTable(
+  "documents",
+  {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   kind: text("kind", { enum: ["resume", "job"] }).notNull(),
   label: text("label").notNull(),
   title: text("title").notNull(),
@@ -26,7 +54,9 @@ export const documents = pgTable("documents", {
   profile: jsonb("profile").notNull(),
   embeddingModel: text("embedding_model").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+  },
+  (t) => [index("documents_user_idx").on(t.userId, t.createdAt)],
+);
 
 export const chunks = pgTable(
   "chunks",
@@ -51,8 +81,12 @@ export const chunks = pgTable(
   ],
 );
 
+/** Chat sessions (conversations), not login sessions. */
 export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   /** Running summary of turns that no longer fit the history budget. */
   summary: text("summary").notNull().default(""),
   /** Number of messages already folded into `summary`. */

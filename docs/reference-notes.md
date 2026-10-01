@@ -323,9 +323,10 @@ question and opened a highlighted citation.
    extraction call holds the upload open, there's no per-document status or
    retry, and the fit single-flight de-duplication is in-process only (not
    multi-instance safe).
-4. **No auth or tenancy.** One shared document space, and rate limits keyed
-   by IP in process memory. Fine for a local tool, but the first thing to
-   change before anyone else uses it.
+4. **Auth is basic.** Accounts and per-user isolation now exist (see the
+   follow-up section), but there's no email verification, password reset,
+   MFA or account deletion endpoint. Rate limits are keyed by IP in process
+   memory.
 5. **Thin frontend unit coverage and no linter.** Component tests are
    static-render only. Chat state transitions (stop, retry, error) are
    covered by one e2e path rather than unit tests, and there's no
@@ -349,3 +350,52 @@ question and opened a highlighted citation.
   so a pnpm override pins that path to esbuild ^0.25. `drizzle-kit generate`
   still works with it. Remove the override once drizzle-kit drops
   `@esbuild-kit`. `pnpm audit` now reports no known vulnerabilities.
+
+## Follow-up — authentication (plan)
+
+Approved scope: email + password accounts, per-user data isolation, and
+`@fastify/cookie` (approved new dependency).
+
+**Files**
+- `packages/shared`: `Credentials` (signup/login) and `Me` schemas.
+- `db/schema.ts` + migration `0001`: `users`, `user_sessions` (stores only a
+  SHA-256 hash of each session token, plus an expiry) and a non-null
+  `user_id` on `documents` and `sessions`. The migration deletes existing
+  documents and chat sessions first: they can't be attributed to a user,
+  and the app hasn't shipped.
+- `lib/auth.ts`: scrypt password hashing with node:crypto, so no
+  dependency. Parameters are stored inside the hash; the cost defaults to
+  N=2^17 (OWASP guidance) and tests lower it via config. Comparisons are
+  constant-time, and a dummy hash is checked for unknown emails so login
+  timing doesn't reveal accounts. Session tokens are 32 random bytes.
+- `routes/auth.ts`: `POST /auth/signup`, `/auth/login`, `/auth/logout` and
+  `GET /auth/me`, with a tight rate limit. The cookie is httpOnly,
+  SameSite=Lax, 7 days, and `Secure` when `COOKIE_SECURE=1`.
+- `app.ts`: every route except health, readiness and auth requires a valid
+  session. Unsafe methods are rejected when `Origin` is present and not an
+  allowed web origin (CSRF defence alongside SameSite). CORS sends
+  credentials. The user id is added to the request logger; emails are
+  never logged.
+- `Store`: every document, chunk, chat session and fit operation takes a
+  `userId`, and search requires explicit document ids. A chat session id
+  belonging to another user is rejected. Labels and the one-resume rule are
+  per user, and fit-cache invalidation is scoped to that user's jobs.
+- Web: a login/sign-up screen, a sign-out button, requests sent with
+  `credentials: "include"`, and a return to the login screen on any 401.
+- Seed signs up (or logs in) a demo user. Evals use a fixed eval user. The
+  e2e test signs up first.
+
+**Tests**: hashing and verification, the auth routes (cookie attributes,
+duplicate email, generic login failure, logout revokes the session, expired
+session), a 401 on every protected route, and the Origin check. The
+isolation suite checks user B can't list, read, delete, cite, chat about or
+fit user A's documents, or reuse A's chat session. It runs at route level
+(memory store) and in the Postgres integration test.
+
+**Done.** Implemented as planned. Verified: 163 unit/route/integration
+tests, including 31 new auth/isolation tests and the Postgres suite. The
+e2e test now signs up and signs out. The migration was applied over a
+database holding pre-auth data. On the full Docker stack: seeding the demo
+user, a rejected wrong password, an httpOnly SameSite=Lax cookie that
+scripts can't read, the session surviving a reload, sign-out, and no CSP
+violations.

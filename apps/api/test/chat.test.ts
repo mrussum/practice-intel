@@ -48,16 +48,16 @@ describe("POST /chat", () => {
   });
 
   it("only cites chunks that were in the context, and resolves them to real chunks", async () => {
-    const { app, deps } = await seeded();
+    const { app, deps, userId } = await seeded();
     const { events, answer } = await ask(app, "What skills am I missing for Job #1?");
     const citations = events.find((e) => e.type === "citations")!;
     if (citations.type !== "citations") throw new Error("unreachable");
     expect(citations.citations.length).toBeGreaterThan(0);
 
-    const docs = await deps.store.listDocuments();
+    const docs = await deps.store.listDocuments(userId);
     for (const c of citations.citations) {
       expect(answer).toContain(`[${c.ref}]`);
-      const chunks = await deps.store.getChunks(c.documentId);
+      const chunks = await deps.store.getChunks(userId, c.documentId);
       expect(chunks.map((x) => x.id)).toContain(c.chunkId);
       expect(docs.find((d) => d.id === c.documentId)?.label).toBe(c.documentLabel);
     }
@@ -127,14 +127,14 @@ describe("POST /chat", () => {
 
   it("folds old turns into a running summary once history exceeds the budget", async () => {
     const { llm, prompts } = recording();
-    const { app, deps } = await seeded({ llm }, testConfig({ HISTORY_TOKEN_BUDGET: "12" }));
+    const { app, deps, userId } = await seeded({ llm }, testConfig({ HISTORY_TOKEN_BUDGET: "12" }));
     const sessionId = crypto.randomUUID();
     for (const q of ["Where did I work before?", "What skills do I list?", "What did I build at Orbit?"]) {
       await ask(app, q, sessionId);
     }
-    const session = await deps.store.getOrCreateSession(sessionId);
-    expect(session.summarizedCount).toBeGreaterThan(0);
-    expect(session.summary).toContain("User asked");
+    const session = await deps.store.getOrCreateSession(userId, sessionId);
+    expect(session?.summarizedCount).toBeGreaterThan(0);
+    expect(session?.summary).toContain("User asked");
     expect(prompts.at(-1)!.messages.at(-1)!.content).toContain("<conversation_summary>");
   });
 
@@ -179,11 +179,11 @@ describe("POST /chat", () => {
 describe("answerQuestion", () => {
   it("stops streaming when aborted and persists the partial answer", async () => {
     const { answerQuestion } = await import("../src/services/chat.js");
-    const { deps, app } = await seeded();
+    const { deps, app, userId } = await seeded();
     const controller = new AbortController();
     const sessionId = crypto.randomUUID();
     const seen: string[] = [];
-    for await (const e of answerQuestion(deps, { historyBudgetTokens: 1000 }, { sessionId, message: "What am I missing for Job #1?", signal: controller.signal })) {
+    for await (const e of answerQuestion(deps, { historyBudgetTokens: 1000 }, { userId, sessionId, message: "What am I missing for Job #1?", signal: controller.signal })) {
       seen.push(e.type);
       if (e.type === "token") controller.abort();
     }

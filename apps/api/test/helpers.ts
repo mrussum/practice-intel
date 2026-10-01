@@ -1,4 +1,5 @@
 import { crc32 } from "node:zlib";
+import type { FastifyInstance, InjectOptions, LightMyRequestResponse } from "fastify";
 import { buildApp } from "../src/app.js";
 import { loadConfig, type Config } from "../src/config.js";
 import type { Deps } from "../src/deps.js";
@@ -8,17 +9,54 @@ import { noopTracer } from "../src/lib/tracing.js";
 import { memoryStore } from "../src/store/memory.js";
 
 export function testConfig(overrides: Record<string, string> = {}): Config {
-  return loadConfig({ NODE_ENV: "test", FAKE_AI: "1", ...overrides });
+  // Cheap scrypt and a generous auth limit keep the suite fast; dedicated
+  // tests override both.
+  return loadConfig({ NODE_ENV: "test", FAKE_AI: "1", PASSWORD_HASH_COST: "10", AUTH_RATE_LIMIT_PER_MINUTE: "1000", ...overrides });
+}
+
+/** An app handle whose requests carry one signed-in user's session cookie. */
+export interface TestClient {
+  inject(opts: InjectOptions): Promise<LightMyRequestResponse>;
+  close(): Promise<void>;
+  cookie: string;
+  userId: string;
+  email: string;
+  server: FastifyInstance;
+}
+
+export const PASSWORD = "correct horse battery";
+
+export function sessionCookie(res: LightMyRequestResponse): string {
+  const c = res.cookies.find((x) => x.name === "ci_session");
+  if (!c) throw new Error(`No session cookie in response (status ${res.statusCode}): ${res.body}`);
+  return `ci_session=${c.value}`;
+}
+
+/** Signs up a fresh user on `server` and returns a client acting as them. */
+export async function signUp(server: FastifyInstance, email = `user-${crypto.randomUUID()}@example.com`): Promise<TestClient> {
+  const res = await server.inject({ method: "POST", url: "/auth/signup", payload: { email, password: PASSWORD } });
+  const cookie = sessionCookie(res);
+  return {
+    cookie,
+    email,
+    userId: (res.json() as { id: string }).id,
+    server,
+    // An explicit cookie header in a test (e.g. another user's) wins.
+    inject: (opts) => server.inject({ ...opts, headers: { cookie, ...opts.headers } }),
+    close: () => server.close(),
+  };
 }
 
 export function testDeps(overrides: Partial<Deps> = {}): Deps {
   return { store: memoryStore(), llm: fakeLlm(), embedder: fakeEmbedder(), tracer: noopTracer(), ...overrides };
 }
 
+/** App with fakes and one signed-in user; `app` is that user's client. */
 export async function testApp(overrides: Partial<Deps> = {}, config = testConfig()) {
   const deps = testDeps(overrides);
-  const app = await buildApp(config, deps);
-  return { app, deps };
+  const server = await buildApp(config, deps);
+  const app = await signUp(server);
+  return { app, deps, server, userId: app.userId };
 }
 
 /** A multipart/form-data body with one file field, as a browser would send it. */
@@ -35,7 +73,7 @@ export function multipart(filename: string, content: Buffer | string, field = "f
   return { payload: body, headers: { "content-type": `multipart/form-data; boundary=${boundary}` } };
 }
 
-export async function upload(app: Awaited<ReturnType<typeof testApp>>["app"], kind: string, filename: string, content: string | Buffer) {
+export async function upload(app: Pick<TestClient, "inject">, kind: string, filename: string, content: string | Buffer) {
   const { payload, headers } = multipart(filename, content);
   return app.inject({ method: "POST", url: `/documents?kind=${kind}`, payload, headers });
 }
@@ -153,7 +191,7 @@ export function parseSse(body: string): import("@career-intel/shared").ChatEvent
     .map((b) => JSON.parse(b.slice(6)));
 }
 
-export async function ask(app: Awaited<ReturnType<typeof testApp>>["app"], message: string, sessionId: string = crypto.randomUUID()) {
+export async function ask(app: Pick<TestClient, "inject">, message: string, sessionId: string = crypto.randomUUID()) {
   const res = await app.inject({ method: "POST", url: "/chat", payload: { sessionId, message } });
   const events = parseSse(res.body);
   const answer = events.flatMap((e) => (e.type === "token" ? [e.text] : [])).join("");

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
   ApiError,
+  Me,
+  type Credentials,
   DocumentDetail,
   DocumentSummary,
   FitRow,
@@ -24,7 +26,9 @@ export class RequestError extends Error {
 async function request<T>(path: string, schema: z.ZodType<T> | null, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, init);
+    // The session cookie is httpOnly and set by the API's origin: it has to be
+    // sent explicitly on cross-origin requests.
+    res = await fetch(`${API_URL}${path}`, { credentials: "include", ...init });
   } catch {
     throw new RequestError("Can't reach the API. Is it running?", 0);
   }
@@ -36,8 +40,18 @@ async function request<T>(path: string, schema: z.ZodType<T> | null, init?: Requ
   return schema.parse(await res.json());
 }
 
+const json = (body: unknown): RequestInit => ({
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(body),
+});
+
 export const api = {
   ready: () => request("/ready", ReadyResponse),
+  me: () => request("/auth/me", Me),
+  signup: (c: Credentials) => request("/auth/signup", Me, json(c)),
+  login: (c: Credentials) => request("/auth/login", Me, json(c)),
+  logout: () => request("/auth/logout", null, { method: "POST" }),
   listDocuments: () => request("/documents", z.array(DocumentSummary)),
   getDocument: (id: string) => request(`/documents/${id}`, DocumentDetail),
   deleteDocument: (id: string) => request(`/documents/${id}`, null, { method: "DELETE" }),

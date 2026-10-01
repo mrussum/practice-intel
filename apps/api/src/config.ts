@@ -31,6 +31,12 @@ const Env = z.object({
   /** Approximate tokens of conversation history sent with each question. */
   HISTORY_TOKEN_BUDGET: z.coerce.number().default(2000),
 
+  /** Send the session cookie only over HTTPS. Set to 1 anywhere that isn't plain-HTTP localhost. */
+  COOKIE_SECURE: flag,
+  /** log2 of scrypt's N. 17 follows OWASP guidance; tests lower it for speed. */
+  PASSWORD_HASH_COST: z.coerce.number().int().min(10).max(20).default(17),
+  AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().default(10),
+
   LANGFUSE_PUBLIC_KEY: optionalString,
   LANGFUSE_SECRET_KEY: optionalString,
   LANGFUSE_HOST: optionalString,

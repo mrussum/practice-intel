@@ -4,6 +4,7 @@ import type { Config } from "../config.js";
 import type { Deps } from "../deps.js";
 import { HttpError } from "../lib/errors.js";
 import { answerQuestion } from "../services/chat.js";
+import { userOf } from "./auth.js";
 
 const sse = (event: ChatEvent) => `data: ${JSON.stringify(event)}\n\n`;
 
@@ -12,6 +13,13 @@ export async function chatRoutes(app: FastifyInstance, { deps, config }: { deps:
     const parsed = ChatRequest.safeParse(req.body);
     if (!parsed.success) {
       throw new HttpError(400, "invalid_request", "Send JSON { sessionId: uuid, message: 1-2000 characters }.");
+    }
+
+    // Ownership check before streaming starts, so a foreign session id gets a
+    // plain 404 response rather than an error inside a 200 event stream.
+    const userId = userOf(req).id;
+    if (!(await deps.store.getOrCreateSession(userId, parsed.data.sessionId))) {
+      throw new HttpError(404, "session_not_found", "This chat session doesn't exist. Start a new chat.");
     }
 
     // Stop generating (and paying for tokens) when the client goes away.
@@ -38,6 +46,7 @@ export async function chatRoutes(app: FastifyInstance, { deps, config }: { deps:
     // plus a generation (tokens, cost) per model call.
     const trace = deps.tracer.startTrace("chat", {
       id: req.id,
+      userId,
       sessionId: parsed.data.sessionId,
       input: { question: parsed.data.message },
     });
@@ -47,7 +56,7 @@ export async function chatRoutes(app: FastifyInstance, { deps, config }: { deps:
       const events = answerQuestion(
         deps,
         { historyBudgetTokens: config.HISTORY_TOKEN_BUDGET },
-        { ...parsed.data, signal: controller.signal, traceId: trace.id },
+        { ...parsed.data, userId, signal: controller.signal, traceId: trace.id },
         {
           span: (name) => trace.span(name),
           onUsage: (u) => trace.generation(u),

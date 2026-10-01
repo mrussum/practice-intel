@@ -15,14 +15,14 @@ async function setup(...args: Parameters<typeof testApp>) {
 
 describe("POST /documents", () => {
   it("ingests a job: chunks, embeds, extracts a profile and labels it", async () => {
-    const { app, deps } = await setup();
+    const { app, deps, userId } = await setup();
     const res = await upload(app, "job", "platform.md", SAMPLE_JOB);
     expect(res.statusCode).toBe(201);
     const doc = DocumentSummary.parse(res.json());
     expect(doc).toMatchObject({ kind: "job", label: "Job #1", title: "Platform Engineer", filename: "platform.md" });
     expect(doc.chunkCount).toBeGreaterThan(1);
 
-    const stored = await deps.store.getDocument(doc.id);
+    const stored = await deps.store.getDocument(userId, doc.id);
     expect((stored!.profile as JobProfile).requirements).toHaveLength(4);
     expect(stored!.embeddingModel).toBe("fake-hash-v1");
   });
@@ -65,11 +65,11 @@ describe("POST /documents", () => {
 
   it("returns 422 and stores nothing when extraction keeps failing", async () => {
     const broken: LLM = { ...fakeLlm(), complete: async (req) => ({ text: "{}", usage: { task: req.task, model: "x", inputTokens: 0, outputTokens: 0, latencyMs: 0 } }) };
-    const { app, deps } = await setup({ llm: broken });
+    const { app, deps, userId } = await setup({ llm: broken });
     const res = await upload(app, "job", "a.md", SAMPLE_JOB);
     expect(res.statusCode).toBe(422);
     expect(res.json()).toMatchObject({ error: "extraction_failed" });
-    expect(await deps.store.listDocuments()).toHaveLength(0);
+    expect(await deps.store.listDocuments(userId)).toHaveLength(0);
   });
 });
 

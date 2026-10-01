@@ -21,7 +21,7 @@ export class IngestError extends Error {}
  */
 export async function ingestDocument(
   deps: IngestDeps,
-  input: { kind: DocumentKind; filename: string; bytes: Buffer },
+  input: { userId: string; kind: DocumentKind; filename: string; bytes: Buffer },
 ): Promise<{ document: StoredDocument; usages: LlmUsage[] }> {
   const text = await parseDocument(input.filename, input.bytes);
   const raw = chunkByStructure(text);
@@ -39,7 +39,7 @@ export async function ingestDocument(
   const title =
     "title" in profile ? profile.title : (profile.name ?? input.filename.replace(/\.[^.]+$/, ""));
 
-  const document = await deps.store.insertDocument({
+  const document = await deps.store.insertDocument(input.userId, {
     kind: input.kind,
     title,
     filename: input.filename,

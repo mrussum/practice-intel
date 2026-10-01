@@ -34,7 +34,7 @@ export interface TraceTotals {
 
 export interface Tracer {
   readonly enabled: boolean;
-  startTrace(name: string, opts: { id?: string; sessionId?: string; input?: Record<string, unknown> }): Trace;
+  startTrace(name: string, opts: { id?: string; userId?: string; sessionId?: string; input?: Record<string, unknown> }): Trace;
   shutdown(): Promise<void>;
 }
 
@@ -75,7 +75,7 @@ export function langfuseTracer(config: { publicKey: string; secretKey: string; b
     enabled: true,
     startTrace(name, opts) {
       const totals = totalsTracker();
-      const trace = client.trace({ id: opts.id, name, sessionId: opts.sessionId, input: opts.input });
+      const trace = client.trace({ id: opts.id, name, userId: opts.userId, sessionId: opts.sessionId, input: opts.input });
       return {
         id: trace.id,
         span(spanName) {

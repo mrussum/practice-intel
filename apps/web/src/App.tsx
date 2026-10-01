@@ -1,24 +1,100 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { Citation } from "@career-intel/shared";
-import { api } from "./lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Citation, Me } from "@career-intel/shared";
+import { api, RequestError } from "./lib/api";
 import { cn } from "./lib/cn";
+import { AuthScreen } from "./components/AuthScreen";
 import { ChatPanel } from "./components/ChatPanel";
 import { CompareView } from "./components/CompareView";
 import { DocumentsPanel } from "./components/DocumentsPanel";
 import { EvidencePanel, type EvidenceTarget } from "./components/EvidencePanel";
 import { FitMatrix } from "./components/FitMatrix";
 import { Badge } from "./components/ui/badge";
+import { Button } from "./components/ui/button";
+import { Spinner } from "./components/ui/spinner";
 import { TabPanel, Tabs } from "./components/ui/tabs";
 
 type View = "chat" | "fit" | "compare";
 
+const SESSION_KEY = "career-intel:session";
+
+/** Chat session ids belong to one user, so they're dropped on login and logout. */
+function forgetChatSession() {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    // Storage unavailable: nothing to forget.
+  }
+}
+
+/**
+ * Drops every cached query except "me", so one user's data can't leak into
+ * the next session. "me" itself is kept and overwritten instead: removing it
+ * would detach the observer that switches between login screen and app.
+ */
+function resetUserData(queryClient: ReturnType<typeof useQueryClient>, me: Me | null) {
+  queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
+  queryClient.setQueryData(meQuery.queryKey, me);
+}
+
+/**
+ * The signed-in user, or null when signed out. A 401 from the API means
+ * "signed out", not an error, so it resolves to null.
+ */
+export const meQuery = {
+  queryKey: ["me"],
+  queryFn: async (): Promise<Me | null> => {
+    try {
+      return await api.me();
+    } catch (err) {
+      if (err instanceof RequestError && err.status === 401) return null;
+      throw err;
+    }
+  },
+  retry: false,
+  staleTime: Infinity,
+} as const;
+
+export function App() {
+  const queryClient = useQueryClient();
+  const me = useQuery(meQuery);
+
+  if (me.isLoading) {
+    return (
+      <p className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Spinner /> Loading…
+      </p>
+    );
+  }
+  if (!me.data) {
+    return (
+      <AuthScreen
+        offline={!!me.error}
+        onAuthed={(user) => {
+          forgetChatSession();
+          resetUserData(queryClient, user);
+        }}
+      />
+    );
+  }
+  return (
+    <Workspace
+      me={me.data}
+      onLogout={async () => {
+        await api.logout().catch(() => undefined); // signed out locally either way
+        forgetChatSession();
+        resetUserData(queryClient, null);
+      }}
+    />
+  );
+}
+
 function initialSessionId(): string {
   try {
-    const existing = sessionStorage.getItem("career-intel:session");
+    const existing = sessionStorage.getItem(SESSION_KEY);
     if (existing) return existing;
     const id = crypto.randomUUID();
-    sessionStorage.setItem("career-intel:session", id);
+    sessionStorage.setItem(SESSION_KEY, id);
     return id;
   } catch {
     return crypto.randomUUID();
@@ -38,7 +114,7 @@ function useWide(): boolean {
   return wide;
 }
 
-export function App() {
+function Workspace({ me, onLogout }: { me: Me; onLogout: () => Promise<void> }) {
   const [view, setView] = useState<View>("chat");
   const [sessionId, setSessionId] = useState(initialSessionId);
   const [evidence, setEvidence] = useState<EvidenceTarget | null>(null);
@@ -64,7 +140,7 @@ export function App() {
   const newChat = () => {
     const id = crypto.randomUUID();
     try {
-      sessionStorage.setItem("career-intel:session", id);
+      sessionStorage.setItem(SESSION_KEY, id);
     } catch {
       // Storage unavailable: the id just won't survive a reload.
     }
@@ -87,6 +163,8 @@ export function App() {
             </Badge>
           ) : null}
           {ready.data?.store === "memory" ? <Badge title="No DATABASE_URL: data is lost on restart.">In-memory store</Badge> : null}
+          <span className="hidden max-w-[200px] truncate text-xs text-muted-foreground sm:inline" title={me.email}>{me.email}</span>
+          <Button variant="ghost" size="sm" onClick={() => void onLogout()}>Sign out</Button>
         </div>
       </header>
 

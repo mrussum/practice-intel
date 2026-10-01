@@ -1,7 +1,7 @@
 import { Writable } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import { ask, SAMPLE_JOB, SAMPLE_RESUME, testConfig, testDeps, upload } from "./helpers.js";
+import { ask, SAMPLE_JOB, SAMPLE_RESUME, signUp, testConfig, testDeps, upload } from "./helpers.js";
 
 let close: (() => Promise<void>) | undefined;
 afterEach(async () => close?.());
@@ -19,7 +19,7 @@ function captureLogs() {
 
 describe("rate limiting", () => {
   it("limits /chat separately and answers 429 in the ApiError shape", async () => {
-    const app = await buildApp(testConfig({ CHAT_RATE_LIMIT_PER_MINUTE: "2" }), testDeps());
+    const app = await signUp(await buildApp(testConfig({ CHAT_RATE_LIMIT_PER_MINUTE: "2" }), testDeps()));
     close = () => app.close();
     const payload = { sessionId: crypto.randomUUID(), message: "What are my skills?" };
     for (let i = 0; i < 2; i++) expect((await app.inject({ method: "POST", url: "/chat", payload })).statusCode).toBe(200);
@@ -29,7 +29,7 @@ describe("rate limiting", () => {
   });
 
   it("applies a global limit but never to health checks", async () => {
-    const app = await buildApp(testConfig({ RATE_LIMIT_PER_MINUTE: "2" }), testDeps());
+    const app = await signUp(await buildApp(testConfig({ RATE_LIMIT_PER_MINUTE: "2" }), testDeps()));
     close = () => app.close();
     const codes = [];
     for (let i = 0; i < 3; i++) codes.push((await app.inject({ method: "GET", url: "/documents" })).statusCode);
@@ -45,7 +45,7 @@ describe("logging", () => {
   it("logs structured lines with request ids but never document text or keys", async () => {
     const logs = captureLogs();
     const config = testConfig({ ANTHROPIC_API_KEY: SECRET, LOG_LEVEL: "debug" });
-    const app = await buildApp(config, testDeps(), { logStream: logs.stream });
+    const app = await signUp(await buildApp(config, testDeps(), { logStream: logs.stream }));
     close = () => app.close();
 
     await upload(app, "resume", "cv.txt", `${SAMPLE_RESUME}\n\nProjects\nBuilt ${SENTINEL} pipeline.`);
@@ -62,6 +62,9 @@ describe("logging", () => {
     expect(chat).toHaveProperty("latencyMs");
     expect(text).not.toContain(SENTINEL);
     expect(text).not.toContain(SECRET);
+    // Emails are personal data: requests are attributed by user id instead.
+    expect(text).not.toContain(app.email);
+    expect(chat).toMatchObject({ userId: app.userId });
   });
 
   it("does not leak query parameters (document text) from database errors", async () => {
@@ -73,7 +76,7 @@ describe("logging", () => {
       Object.assign(err, { params: [SENTINEL], cause: Object.assign(new Error("connection terminated"), { code: "57P01" }) });
       throw err;
     };
-    const app = await buildApp(testConfig(), deps, { logStream: logs.stream });
+    const app = await signUp(await buildApp(testConfig(), deps, { logStream: logs.stream }));
     close = () => app.close();
 
     const res = await upload(app, "resume", "cv.txt", SAMPLE_RESUME);
@@ -84,7 +87,7 @@ describe("logging", () => {
   });
 
   it("propagates a caller's x-request-id and generates one otherwise", async () => {
-    const app = await buildApp(testConfig(), testDeps());
+    const app = await signUp(await buildApp(testConfig(), testDeps()));
     close = () => app.close();
     const given = await app.inject({ method: "GET", url: "/health", headers: { "x-request-id": "trace-abc-12345" } });
     expect(given.headers["x-request-id"]).toBe("trace-abc-12345");
@@ -95,7 +98,7 @@ describe("logging", () => {
 
 describe("request size", () => {
   it("rejects oversized JSON bodies", async () => {
-    const app = await buildApp(testConfig(), testDeps());
+    const app = await signUp(await buildApp(testConfig(), testDeps()));
     close = () => app.close();
     const res = await app.inject({
       method: "POST",
@@ -106,7 +109,7 @@ describe("request size", () => {
   });
 
   it("rejects over-long questions", async () => {
-    const app = await buildApp(testConfig(), testDeps());
+    const app = await signUp(await buildApp(testConfig(), testDeps()));
     close = () => app.close();
     const res = await app.inject({ method: "POST", url: "/chat", payload: { sessionId: crypto.randomUUID(), message: "x".repeat(2001) } });
     expect(res.statusCode).toBe(400);

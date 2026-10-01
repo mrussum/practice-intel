@@ -13,10 +13,11 @@ the exact source passage.
 
 ```bash
 docker compose up --build                     # web: http://localhost:8080  api: http://localhost:3001
-docker compose --profile seed run --rm seed   # optional: load the fictional fixtures
+docker compose --profile seed run --rm seed   # optional: demo user + fictional fixtures
 ```
 
-That works from a clean clone with no keys. The app then runs in **demo
+Sign up on the login screen. If you ran the seed, log in as
+`demo@example.com` / `demo-password-123`. That works from a clean clone with no keys. The app then runs in **demo
 mode**: deterministic fake AI and embeddings, clearly badged in the UI. For
 real answers:
 
@@ -33,7 +34,7 @@ docker compose up db    # Postgres + pgvector
 pnpm install
 pnpm --filter @career-intel/api db:migrate
 pnpm dev                # web :5173, api :3001 (with DATABASE_URL unset, the API uses an in-memory store)
-pnpm seed               # load fixtures into the running API
+pnpm seed               # demo user + fixtures in the running API
 ```
 
 | Command | What it runs |
@@ -143,7 +144,8 @@ citations that point at chunks it actually supplied.
   evals and e2e, and Docker Compose from a clean clone.
 
 **Skipped, and why**
-- Authentication and multi-tenancy: single-user local tool (see AWS plan).
+- Third-party identity (SSO, OAuth), email verification and password reset:
+  accounts are email + password only (see the AWS plan for Cognito).
 - ESLint/Prettier config: strict `tsc` catches more of what matters here,
   and a formatter is a quick follow-up.
 - Load testing and horizontal scaling: out of scope for a local assistant.
@@ -152,6 +154,10 @@ citations that point at chunks it actually supplied.
 
 ## Privacy and data handling
 
+- Each account sees only its own documents and conversations. Every query
+  is scoped by user id, and another user's ids return 404. Passwords are
+  hashed with scrypt, session cookies are httpOnly and SameSite=Lax, and
+  only a hash of each session token is stored.
 - Documents, chunks, embeddings and conversations are stored only in your
   local Postgres (or in memory). Nothing is sent anywhere except the model
   and embedding providers you configure. `DELETE /documents/:id` (the bin
@@ -177,9 +183,11 @@ citations that point at chunks it actually supplied.
   takes slow provider calls off the request path and makes retries safe.
 - **Secrets:** **Secrets Manager** for the Anthropic, embedding and Langfuse
   keys, injected as ECS secrets. IAM task roles, no static credentials.
-- **Auth and tenancy:** **Cognito** (hosted UI + JWT) verified by the API,
-  and a `user_id` on every table enforced in the store layer (or with
-  Postgres row-level security).
+- **Auth and tenancy:** the app already has per-user accounts with every
+  query scoped by `user_id`. In production, swap the local email/password
+  login for **Cognito** (hosted UI, MFA, password reset) verified by the
+  API, set `COOKIE_SECURE=1` behind HTTPS, and consider Postgres row-level
+  security as a second line of defence.
 - **Observability:** pino JSON → **CloudWatch Logs**, with metrics from log
   fields (latency, tokens, cost per request). **OpenTelemetry** traces to
   X-Ray alongside Langfuse for LLM traces. Alarms on error rate, p95
@@ -242,4 +250,4 @@ provider documentation rather than recalled.
 - Background ingestion with per-document status and retries.
 - Conversation history UI, export of the fit matrix, and cover-letter
   drafting grounded in the same evidence.
-- Auth, per-user data isolation and budgets (see the AWS plan).
+- Email verification, password reset and per-user budgets (see the AWS plan).

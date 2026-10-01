@@ -4,6 +4,7 @@ import { DocumentKind, type DocumentDetail, type DocumentSummary } from "@career
 import type { Config } from "../config.js";
 import type { Deps } from "../deps.js";
 import { HttpError } from "../lib/errors.js";
+import { userOf } from "./auth.js";
 import { ingestDocument } from "../services/ingest.js";
 import type { StoredDocument } from "../store/types.js";
 
@@ -41,7 +42,7 @@ export async function documentRoutes(app: FastifyInstance, { deps, config }: { d
 
     const trace = deps.tracer.startTrace("ingest", { id: req.id, input: { kind: query.data.kind, bytes: bytes.length } });
     const span = trace.span("ingest");
-    const { document, usages } = await ingestDocument(deps, { kind: query.data.kind, filename: file.filename, bytes });
+    const { document, usages } = await ingestDocument(deps, { userId: userOf(req).id, kind: query.data.kind, filename: file.filename, bytes });
     span.end({ chunks: document.chunkCount });
     usages.forEach((u) => trace.generation(u));
     const totals = trace.end({ documentId: document.id });
@@ -53,18 +54,19 @@ export async function documentRoutes(app: FastifyInstance, { deps, config }: { d
     return reply.code(201).send(toSummary(document));
   });
 
-  app.get("/documents", async () => (await deps.store.listDocuments()).map(toSummary));
+  app.get("/documents", async (req) => (await deps.store.listDocuments(userOf(req).id)).map(toSummary));
 
   app.get("/documents/:id", async (req): Promise<DocumentDetail> => {
     const id = parseId(req.params);
-    const doc = await deps.store.getDocument(id);
+    const userId = userOf(req).id;
+    const doc = await deps.store.getDocument(userId, id);
     if (!doc) throw new HttpError(404, "not_found", "Document not found. It may have been deleted.");
-    return { ...toSummary(doc), profile: doc.profile, chunks: await deps.store.getChunks(id) };
+    return { ...toSummary(doc), profile: doc.profile, chunks: await deps.store.getChunks(userId, id) };
   });
 
   app.delete("/documents/:id", async (req, reply) => {
     const id = parseId(req.params);
-    if (!(await deps.store.deleteDocument(id))) {
+    if (!(await deps.store.deleteDocument(userOf(req).id, id))) {
       throw new HttpError(404, "not_found", "Document not found. It may already have been deleted.");
     }
     req.log.info({ documentId: id }, "document deleted");

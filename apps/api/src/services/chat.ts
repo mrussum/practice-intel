@@ -1,6 +1,7 @@
 import type { ChatEvent, Chunk, Intent } from "@career-intel/shared";
 import type { Deps } from "../deps.js";
 import { extractCitations, type RefTarget } from "../lib/citations.js";
+import { HttpError } from "../lib/errors.js";
 import { trimHistory, type Turn } from "../lib/history.js";
 import type { ContextSnippet, LlmUsage, ProfileContext } from "../lib/llm.js";
 import { resolveMentions } from "../lib/mentions.js";
@@ -54,7 +55,7 @@ Keep the questions asked, the jobs discussed and the conclusions reached. The co
 export async function* answerQuestion(
   deps: Deps,
   opts: ChatOptions,
-  req: { sessionId: string; message: string; signal?: AbortSignal; traceId?: string },
+  req: { userId: string; sessionId: string; message: string; signal?: AbortSignal; traceId?: string },
   hooks: ChatHooks = {},
 ): AsyncGenerator<ChatEvent, void> {
   const startSpan = hooks.span ?? (() => ({ end() {} }));
@@ -68,8 +69,10 @@ export async function* answerQuestion(
   };
   const usage = (u: LlmUsage[]) => u.forEach((x) => hooks.onUsage?.(x));
 
-  const session = await deps.store.getOrCreateSession(req.sessionId);
-  const [docs, messages] = await Promise.all([deps.store.listDocuments(), deps.store.listMessages(req.sessionId)]);
+  const session = await deps.store.getOrCreateSession(req.userId, req.sessionId);
+  // Same answer for "taken by someone else" as for any unknown resource.
+  if (!session) throw new HttpError(404, "session_not_found", "This chat session doesn't exist. Start a new chat.");
+  const [docs, messages] = await Promise.all([deps.store.listDocuments(req.userId), deps.store.listMessages(req.sessionId)]);
 
   const mentioned = resolveMentions(req.message, docs);
   const routed = await step("route", () => routeIntent(deps.llm, req.message, docs.map((d) => d.label)));
