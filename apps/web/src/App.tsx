@@ -161,9 +161,13 @@ function Workspace({ me, onLogout }: { me: Me; onLogout: () => Promise<void> }) 
         <div className="flex items-center gap-2" aria-live="polite">
           {ready.error ? (
             <Badge variant="missing" className="border-transparent">API offline</Badge>
-          ) : ready.data?.ai === "fake" || ready.data?.embeddings === "fake" ? (
+          ) : ready.data?.ai === "fake" ? (
             <Badge variant="amber" className="border-transparent" title="No API keys configured: deterministic stand-ins are answering. Add keys to .env for real answers.">
               Demo mode
+            </Badge>
+          ) : ready.data?.embeddings === "fake" ? (
+            <Badge variant="amber" className="border-transparent" title="Answers come from the real model, but there's no embedding key, so retrieval uses demo embeddings plus full-text search. Add VOYAGE_API_KEY or OPENAI_API_KEY to .env.">
+              Demo embeddings
             </Badge>
           ) : null}
           {ready.data?.store === "memory" ? <Badge variant="onBrand" title="No DATABASE_URL: data is lost on restart.">In-memory store</Badge> : null}
