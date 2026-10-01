@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { LlmError, structured, type LLM } from "../src/lib/llm.js";
+import { JobProfile, ResumeProfile } from "@career-intel/shared";
+import { LlmError, providerSchema, structured, type LLM } from "../src/lib/llm.js";
+import { RouterOutput } from "../src/lib/router.js";
+import { FitOutput } from "../src/services/fit.js";
 
 /** An LLM that replays canned responses, recording the prompts it saw. */
 function scripted(responses: string[]) {
@@ -43,5 +46,27 @@ describe("structured", () => {
     const { llm } = scripted(["not json", '{"intent":1}']);
     await expect(structured(llm, req)).rejects.toThrow(LlmError);
     expect(llm.complete).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("providerSchema", () => {
+  // Keywords Anthropic's structured outputs reject with a 400.
+  const UNSUPPORTED = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength"];
+
+  const keysIn = (node: unknown): string[] =>
+    Array.isArray(node)
+      ? node.flatMap(keysIn)
+      : node && typeof node === "object"
+        ? Object.entries(node).flatMap(([k, v]) => [k, ...keysIn(v)])
+        : [];
+
+  it.each([
+    ["ResumeProfile", ResumeProfile],
+    ["JobProfile", JobProfile],
+    ["FitOutput", FitOutput],
+    ["RouterOutput", RouterOutput],
+  ])("strips unsupported keywords from %s", (_name, schema) => {
+    const sent = providerSchema(z.toJSONSchema(schema) as Record<string, unknown>);
+    expect(keysIn(sent).filter((k) => UNSUPPORTED.includes(k))).toEqual([]);
   });
 });

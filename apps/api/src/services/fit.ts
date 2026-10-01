@@ -5,7 +5,7 @@ import { HttpError } from "../lib/errors.js";
 import { structured, type LlmUsage } from "../lib/llm.js";
 import { escapeDocumentText } from "../lib/prompt.js";
 
-const FitOutput = z.object({
+export const FitOutput = z.object({
   rows: z.array(
     z.object({
       requirementIndex: z.number().int(),
