@@ -1,22 +1,126 @@
-import Fastify from "fastify";
+import Fastify, { type FastifyError } from "fastify";
+import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
+import type { ApiError } from "@career-intel/shared";
 import type { Config } from "./config.js";
+import { createDeps, type Deps } from "./deps.js";
+import { AiProviderError, HttpError, safeErrorForLog } from "./lib/errors.js";
+import { LlmError } from "./lib/llm.js";
+import { ParseError } from "./lib/parse.js";
+import { IngestError } from "./services/ingest.js";
+import { authenticate, authRoutes } from "./routes/auth.js";
+import { chatRoutes } from "./routes/chat.js";
+import { documentRoutes } from "./routes/documents.js";
 import { healthRoutes } from "./routes/health.js";
+import { jobRoutes } from "./routes/jobs.js";
+
+function toApiError(err: unknown): { status: number; body: ApiError } {
+  if (err instanceof HttpError) return { status: err.statusCode, body: { error: err.code, message: err.message } };
+  if (err instanceof ParseError) return { status: 400, body: { error: "invalid_file", message: err.message } };
+  if (err instanceof IngestError) return { status: 422, body: { error: "unprocessable", message: err.message } };
+  if (err instanceof AiProviderError) {
+    return { status: 502, body: { error: "ai_unavailable", message: `${err.message} Try again shortly.` } };
+  }
+  if (err instanceof LlmError) {
+    return { status: 422, body: { error: "extraction_failed", message: `${err.message} Try again, or check the document is a resume or job description.` } };
+  }
+  const fe = err as Partial<FastifyError>;
+  if (fe.statusCode && fe.statusCode >= 400 && fe.statusCode < 500) {
+    const message =
+      fe.code === "FST_REQ_FILE_TOO_LARGE" ? "File is too large. The limit is 5MB." : (fe.message ?? "Bad request.");
+    return { status: fe.statusCode, body: { error: fe.code ?? "bad_request", message } };
+  }
+  return { status: 500, body: { error: "internal", message: "Something went wrong on our side. Try again; if it persists, check the API logs." } };
+}
 
 /**
  * Builds the app without listening, so tests can use `app.inject()`
  * against the real routing/validation stack with no network.
  */
-export async function buildApp(config: Config) {
+export async function buildApp(
+  config: Config,
+  injected?: Partial<Deps>,
+  options: { logStream?: NodeJS.WritableStream } = {},
+) {
+  const loggerOptions = {
+    level: config.LOG_LEVEL,
+    serializers: { err: safeErrorForLog },
+    // Belt and braces: never log credentials even if a header is logged.
+    redact: ["req.headers.authorization", "req.headers.cookie", "req.headers[\"x-api-key\"]"],
+  };
   const app = Fastify({
-    logger: config.NODE_ENV === "test" ? false : { level: config.LOG_LEVEL },
-    genReqId: () => crypto.randomUUID(), // request id on every log line
+    logger: options.logStream
+      ? { ...loggerOptions, stream: options.logStream }
+      : config.NODE_ENV === "test"
+        ? false
+        : loggerOptions,
+    genReqId: (req) => {
+      const incoming = req.headers["x-request-id"];
+      return typeof incoming === "string" && /^[\w-]{8,64}$/.test(incoming) ? incoming : crypto.randomUUID();
+    },
+    bodyLimit: 64 * 1024, // JSON bodies are tiny; uploads have their own multipart limit
   });
 
-  await app.register(cors, { origin: config.WEB_ORIGIN });
-  await app.register(healthRoutes);
-  // TODO day 2: documentsRoutes (upload + ingest)
-  // TODO day 3: chatRoutes (SSE)
+  const deps: Deps = { ...(await createDeps(config)), ...injected };
+  app.addHook("onClose", async () => {
+    await deps.tracer.shutdown();
+    await deps.store.close();
+  });
+  app.addHook("onSend", async (req, reply) => {
+    reply.header("x-request-id", req.id);
+  });
+
+  app.setErrorHandler((err, req, reply) => {
+    const { status, body } = toApiError(err);
+    if (status >= 500) req.log.error({ err }, "request failed");
+    else req.log.info({ code: body.error, status }, "request rejected");
+    return reply.code(status).send(body);
+  });
+
+  const allowedOrigins = config.WEB_ORIGIN.split(",").map((o) => o.trim());
+  await app.register(cors, {
+    origin: allowedOrigins,
+    credentials: true, // the session cookie travels with API calls from the web app
+    methods: ["GET", "POST", "DELETE"],
+    exposedHeaders: ["x-request-id"],
+  });
+  await app.register(cookie);
+
+  // CSRF defence alongside SameSite=Lax: a state-changing request carrying an
+  // Origin must come from the web app. Requests without Origin (curl, server
+  // to server) carry no browser cookies unless deliberately given one.
+  app.decorateRequest("user", null);
+  app.addHook("onRequest", async (req) => {
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return;
+    const origin = req.headers.origin;
+    if (origin && !allowedOrigins.includes(origin)) {
+      throw new HttpError(403, "forbidden_origin", "This request came from a page that isn't allowed to use this API.");
+    }
+  });
+
+  await app.register(rateLimit, {
+    max: config.RATE_LIMIT_PER_MINUTE,
+    timeWindow: "1 minute",
+    // Thrown into the error handler below, which renders the ApiError shape.
+    errorResponseBuilder: (_req, ctx) => ({
+      statusCode: 429,
+      code: "rate_limited",
+      message: `Too many requests. Wait ${Math.ceil(ctx.ttl / 1000)}s and try again.`,
+    }),
+  });
+  await app.register(multipart);
+  await app.register(healthRoutes, { deps, config });
+  await app.register(authRoutes, { deps, config });
+
+  // Everything below requires a signed-in user, and every query is scoped to them.
+  await app.register(async (protectedScope) => {
+    protectedScope.addHook("onRequest", authenticate(deps));
+    await protectedScope.register(documentRoutes, { deps, config });
+    await protectedScope.register(jobRoutes, { deps });
+    await protectedScope.register(chatRoutes, { deps, config });
+  });
 
   return app;
 }

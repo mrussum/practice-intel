@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # Weekly, grouped so upgrades arrive as a few reviewable PRs, not dozens.
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      dev-tooling:
+        dependency-type: development
+      runtime:
+        dependency-type: production
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directories: [/apps/api, /apps/web]
+    schedule: { interval: weekly }

@@ -1,13 +1,35 @@
-import { describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.js";
-import { loadConfig } from "../src/config.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { ReadyResponse } from "@career-intel/shared";
+import { testApp } from "./helpers.js";
 
-describe("GET /health", () => {
-  it("returns ok", async () => {
-    const app = await buildApp(loadConfig({ NODE_ENV: "test" }));
+let close: (() => Promise<void>) | undefined;
+afterEach(async () => close?.());
+
+describe("health", () => {
+  it("GET /health returns ok", async () => {
+    const { app } = await testApp();
+    close = () => app.close();
     const res = await app.inject({ method: "GET", url: "/health" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: "ok" });
-    await app.close();
+  });
+
+  it("GET /ready reports store and AI mode", async () => {
+    const { app } = await testApp();
+    close = () => app.close();
+    const res = await app.inject({ method: "GET", url: "/ready" });
+    expect(ReadyResponse.parse(res.json())).toEqual({ status: "ready", store: "memory", ai: "fake", embeddings: "fake" });
+    expect(res.headers["x-request-id"]).toBeTruthy();
+  });
+
+  it("GET /ready returns 503 when the store is down", async () => {
+    const { app, deps } = await testApp();
+    close = () => app.close();
+    deps.store.ping = async () => {
+      throw new Error("connection refused");
+    };
+    const res = await app.inject({ method: "GET", url: "/ready" });
+    expect(res.statusCode).toBe(503);
+    expect(res.json().status).toBe("unavailable");
   });
 });
