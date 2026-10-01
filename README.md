@@ -9,6 +9,24 @@ what you're missing, how the jobs compare and what to prepare for interviews.
 Every answer is grounded in your documents, with numbered citations that open
 the exact source passage.
 
+## Screenshots
+
+Captured with real Claude answers (Sonnet 5 for answers and fit, Haiku 4.5 for
+routing and extraction) over the fictional fixtures in `evals/fixtures`.
+Embeddings were in demo mode because no embedding key was set. There's also a
+54-second walkthrough video: [`docs/screenshots/walkthrough.webm`](docs/screenshots/walkthrough.webm).
+
+| | |
+| --- | --- |
+| ![Skill gaps answer with citations, and the cited resume passage highlighted in the evidence panel](docs/screenshots/03-gaps-with-evidence.png) | ![Fit matrix for one job: must-haves marked met, partial or missing, with an overall bar](docs/screenshots/05-fit-matrix.png) |
+| **Skill gaps.** "What skills am I missing for Job #2?" Every claim cites a chunk; clicking a citation highlights it. The job contains a planted prompt injection, which the answer flags and ignores. | **Fit matrix.** Each requirement is met, partial or missing, with the evidence behind it. |
+| ![Experience alignment answer with numbered sources](docs/screenshots/04-alignment.png) | ![Requirements compared across three jobs](docs/screenshots/06-compare-jobs.png) |
+| **Alignment.** "How does my experience align with Job #1?" | **Compare jobs.** Shared requirements across all jobs. |
+| ![Interview preparation answer](docs/screenshots/07-interview-prep.png) | ![Evidence opening as a drawer at tablet width](docs/screenshots/08-tablet-evidence-drawer.png) |
+| **Interview prep.** Likely questions and what the resume can (and can't) back up. | **Tablet.** Evidence opens as a drawer below the `xl` breakpoint. |
+
+Also: [sign-in](docs/screenshots/01-sign-in.png) · [workspace with suggested questions](docs/screenshots/02-workspace.png).
+
 ## Quick start
 
 ```bash
@@ -90,6 +108,11 @@ The prompt builder wraps documents as escaped, untrusted data with short
 chunk refs. Sonnet streams the answer over SSE, and the server keeps only
 citations that point at chunks it actually supplied.
 
+More diagrams (API internals, upload and chat sequences, retrieval, auth, data
+model, CI and the AWS deployment) are in [`docs/architecture.md`](docs/architecture.md).
+Every requirement in the brief is mapped to its implementation and tests in
+[`docs/traceability.md`](docs/traceability.md).
+
 ## RAG / LLM approach
 
 | Area | Choice | Alternatives considered | Why |
@@ -104,7 +127,7 @@ citations that point at chunks it actually supplied.
 | Prompt & history | Rules in the system prompt. Documents in `<document id label>` tags, escaped and marked untrusted. The last 6 messages (within a token budget) are kept verbatim, older turns are folded into a running summary by Haiku | Full history; vector memory | Bounded cost per turn without losing what was discussed. |
 | Structured output | JSON-schema-constrained generation from the shared Zod schemas, then Zod validation, then one repair retry, then a clear 422 | Tool calls; regex parsing | One schema definition serves the API contract, the model constraint and validation. |
 | Guardrails | Off-topic gets a fixed reply (no model call). Injection is handled by delimiting, escaping and system-only rules. Citations are validated server-side. Fit rows are mapped back by index. Rate limits, size limits, log hygiene | Moderation/injection classifier | Layered, cheap and testable. A classifier is the next step if abuse shows up. |
-| Quality | 20-case golden set: intent accuracy, retrieval hit@k with forbidden-doc checks, must/mustNot mentions, citation groundedness, optional Haiku faithfulness judge. CI gates on fake mode | Manual spot checks | Regressions in routing, filtering and citation handling fail the build. Real-model runs measure answer quality. |
+| Quality | 20-case golden set: intent accuracy, retrieval hit@k with forbidden-doc checks, must/mustNot mentions, citation groundedness, optional Haiku faithfulness judge. CI gates on fake mode | Manual spot checks | Regressions in routing, filtering and citation handling fail the build. Real-model runs measure answer quality (first run: `evals/report-real.md`). |
 | Observability | pino JSON logs with request ids, plus per-request token, cost and latency totals. Langfuse traces (route / retrieve / summarize / generate spans + generations) when keys are set | OpenTelemetry end to end | Langfuse is built for LLM traces and cost. The `Tracer` interface keeps an OTel exporter a small change. |
 
 ## Key decisions and trade-offs

@@ -2,6 +2,16 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- Real-model structured output (profile extraction, routing, fit) failed with HTTP 400: Anthropic rejects JSON Schema keywords such as `minimum`. The schema sent to the API now goes through the SDK's `transformJSONSchema`; Zod still enforces the constraints.
+- The header said "Demo mode" whenever embeddings were fake, even with a real model answering. It now says "Demo embeddings" in that case.
+
+### Added
+- First real-model eval report (`evals/report-real.md`): all five gates pass.
+- Screenshots and a walkthrough video in `docs/screenshots/`, shown in the README.
+
 ## [1.0.0] — 2026-10-01
 
 First complete release of the Career Intelligence Assistant. Requirement-by-
