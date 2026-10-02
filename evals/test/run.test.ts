@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { checkAnswer, checkIntent, checkRetrieval, groundedness, scoreClaims } from "../run.js";
+import { checkAnswer, checkFitNotInflated, checkIntent, checkRetrieval, groundedness, scoreClaims, totalCostUsd } from "../run.js";
 
-const base = { id: "x", question: "q", expectIntent: ["gaps" as const], expectDocs: [], forbidDocs: [], mustMention: [], mustNotMention: [] };
+const base = { id: "x", question: "q", expectIntent: ["gaps" as const], expectDocs: [], forbidDocs: [], mustMention: [], mustNotMention: [], before: [], realOnly: false };
 
 describe("eval scoring", () => {
   it("intent passes when the router picks any of the accepted labels", () => {
@@ -38,5 +38,18 @@ describe("eval scoring", () => {
     ]);
     expect(out).toEqual({ score: 0.5, unsupportedClaims: ["Kafka was used at Brightpath — Kafka is at Parcelly"] });
     expect(scoreClaims([]).score).toBe(1);
+  });
+
+  it("fit inflation: no must-have may be met for a job the resume clearly doesn't fit", () => {
+    const row = (skill: string, priority: string, status: string) => ({ requirement: { skill, priority }, status });
+    expect(checkFitNotInflated("Job #1", true, [row("Swift", "must", "missing"), row("GraphQL", "nice", "met")])).toEqual([]);
+    expect(checkFitNotInflated("Job #1", true, [row("Swift", "must", "met")])).toEqual(["fit marks must-haves met: Swift"]);
+    expect(checkFitNotInflated("Job #9", false, [])).toEqual(["no job labelled Job #9"]);
+  });
+
+  it("cost is unknown when any call used an unpriced model", () => {
+    const u = (model: string) => ({ task: "answer" as const, model, inputTokens: 1_000_000, outputTokens: 100_000, latencyMs: 0 });
+    expect(totalCostUsd([u("claude-haiku-4-5")])).toBeCloseTo(1.5);
+    expect(totalCostUsd([u("claude-haiku-4-5"), u("fake")])).toBeNull();
   });
 });
