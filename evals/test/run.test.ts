@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { checkAnswer, checkRetrieval, groundedness } from "../run.js";
+import { checkAnswer, checkIntent, checkRetrieval, groundedness } from "../run.js";
 
-const base = { id: "x", question: "q", expectIntent: "gaps" as const, expectDocs: [], forbidDocs: [], mustMention: [], mustNotMention: [] };
+const base = { id: "x", question: "q", expectIntent: ["gaps" as const], expectDocs: [], forbidDocs: [], mustMention: [], mustNotMention: [] };
 
 describe("eval scoring", () => {
+  it("intent passes when the router picks any of the accepted labels", () => {
+    const c = { ...base, expectIntent: ["fit" as const, "off_topic" as const] };
+    expect(checkIntent(c, "off_topic")).toEqual({ ok: true, notes: [] });
+    expect(checkIntent(c, "fit").ok).toBe(true);
+    expect(checkIntent(c, "gaps")).toEqual({ ok: false, notes: ["intent gaps ≠ fit | off_topic"] });
+  });
+
   it("retrieval passes only when expected docs are present and forbidden ones absent", () => {
     const c = { ...base, expectDocs: ["Job #2"], forbidDocs: ["Job #1"] };
     expect(checkRetrieval(c, new Set(["Job #2", "Resume"])).ok).toBe(true);

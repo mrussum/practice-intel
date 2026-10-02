@@ -29,7 +29,9 @@ import { memoryStore } from "../apps/api/src/store/memory.js";
 const GoldenCase = z.object({
   id: z.string(),
   question: z.string(),
-  expectIntent: Intent,
+  // A list means any of these labels is acceptable (e.g. an injection may be
+  // answered as a fit question or refused as off-topic; both are safe).
+  expectIntent: z.union([Intent, z.array(Intent).min(1)]).transform((x) => (Array.isArray(x) ? x : [x])),
   expectDocs: z.array(z.string()).default([]),
   forbidDocs: z.array(z.string()).default([]),
   mustMention: z.array(z.string()).default([]),
@@ -47,6 +49,7 @@ interface CaseResult {
   answerOk: boolean;
   groundedness: number | null;
   faithfulness: number | null;
+  unsupportedClaims: string[];
   notes: string[];
   answer: string;
 }
@@ -65,6 +68,11 @@ export function checkRetrieval(c: GoldenCase, retrievedLabels: Set<string>): { o
     ...(leaked.length ? [`should be filtered: ${leaked.join(", ")}`] : []),
   ];
   return { ok: notes.length === 0, notes };
+}
+
+export function checkIntent(c: GoldenCase, intent: string): { ok: boolean; notes: string[] } {
+  const ok = c.expectIntent.some((x) => x === intent);
+  return { ok, notes: ok ? [] : [`intent ${intent} ≠ ${c.expectIntent.join(" | ")}`] };
 }
 
 export function checkAnswer(c: GoldenCase, answer: string): { ok: boolean; notes: string[] } {
@@ -86,7 +94,7 @@ export function groundedness(answer: string, contextRefs: Set<string>): number |
 
 const JudgeOutput = z.object({ score: z.number().min(0).max(1), unsupportedClaims: z.array(z.string()) });
 
-async function judge(deps: Deps, answer: string, ctx: AnswerContext): Promise<number> {
+async function judge(deps: Deps, answer: string, ctx: AnswerContext): Promise<z.infer<typeof JudgeOutput>> {
   const context = ctx.refs.map((r) => ({ ref: r.ref, text: r.text }));
   const { data } = await structured(deps.llm, {
     task: "judge",
@@ -100,7 +108,7 @@ async function judge(deps: Deps, answer: string, ctx: AnswerContext): Promise<nu
     schema: JudgeOutput,
     input: { answer, context },
   });
-  return data.score;
+  return data;
 }
 
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
@@ -152,17 +160,18 @@ async function main() {
     const retrieved = new Set((ctx?.refs ?? []).map((r) => labelOf.get(r.documentId) ?? "?"));
     const retrieval = checkRetrieval(c, retrieved);
     const answerCheck = checkAnswer(c, answer);
-    const intentOk = intent === c.expectIntent;
-    const faithfulness = args.has("--judge") && ctx && ctx.refs.length ? await judge(deps, answer, ctx) : null;
+    const intentCheck = checkIntent(c, intent);
+    const verdict = args.has("--judge") && ctx && ctx.refs.length ? await judge(deps, answer, ctx) : null;
     results.push({
       id: c.id,
       intent,
-      intentOk,
+      intentOk: intentCheck.ok,
       retrievalOk: retrieval.ok,
       answerOk: answerCheck.ok,
       groundedness: groundedness(answer, new Set((ctx?.refs ?? []).map((r) => r.ref))),
-      faithfulness,
-      notes: [...(intentOk ? [] : [`intent ${intent} ≠ ${c.expectIntent}`]), ...retrieval.notes, ...answerCheck.notes],
+      faithfulness: verdict?.score ?? null,
+      unsupportedClaims: verdict?.unsupportedClaims ?? [],
+      notes: [...intentCheck.notes, ...retrieval.notes, ...answerCheck.notes],
       answer,
     });
   }
@@ -219,6 +228,17 @@ async function main() {
     "| " + header.map(() => "---").join(" | ") + " |",
     ...rows.map((r) => "| " + r.map((c) => c.replace(/\|/g, "\\|")).join(" | ") + " |"),
     "",
+    ...(results.some((r) => r.unsupportedClaims.length)
+      ? [
+          "<details><summary>Claims the judge marked unsupported</summary>",
+          "",
+          ...results
+            .filter((r) => r.unsupportedClaims.length)
+            .flatMap((r) => [`**${r.id}** (faithfulness ${r.faithfulness?.toFixed(2)})`, "", ...r.unsupportedClaims.map((u) => `- ${u}`), ""]),
+          "</details>",
+          "",
+        ]
+      : []),
     "<details><summary>Answers</summary>",
     "",
     ...results.flatMap((r) => [`**${r.id}**`, "", "```text", r.answer.trim(), "```", ""]),

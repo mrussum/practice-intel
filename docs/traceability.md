@@ -82,7 +82,7 @@ means `apps/web/…`.
 | Fixtures: one fictional resume, three fictional JDs (strong / partial / weak) | ✅ | `evals/fixtures/` | Fit levels visible in the compare grid and the evals |
 | ~20 golden cases: every intent, injection, not-found, cross-job comparison | ✅ | `evals/golden.jsonl` (20 cases) | `evals/report.md` |
 | Runner: intent accuracy, retrieval hit@k, must/mustNot mention, citation groundedness, optional Haiku judge; table, `report.md`, non-zero exit below thresholds | ✅ | `evals/run.ts` | `evals/test/run.test.ts`; CI `evals` job |
-| Fake mode in CI plus a real-model mode | 🟡 | `pnpm eval` / `pnpm eval --real --judge` | First real run on 2026-10-01 (Sonnet 5 / Haiku 4.5, demo embeddings): all five gates pass, see `evals/report-real.md`. It found and fixed a 400 from unsupported schema keywords. Still 🟡: not run with real embeddings, and not scheduled in CI |
+| Fake mode in CI plus a real-model mode | 🟡 | `pnpm eval` / `pnpm eval --real --judge` | Real runs on 2026-10-01 and 2026-10-02 (Sonnet 5 / Haiku 4.5, demo embeddings): all five gates passed both times. The latest report, with the claims the judge rejected, is `evals/report-real.md`. The first run found and fixed a 400 from unsupported schema keywords. Still 🟡: not run with real embeddings, not scheduled in CI, and the faithfulness judge misreads gap answers (see open items) |
 | One Playwright e2e: upload → gap question → citation opens the evidence panel | ✅ | `web/e2e/upload-ask.spec.ts` (now also signs up and signs out) | CI `e2e` job |
 | Eval job enabled in CI (fake mode) | ✅ | `.github/workflows/ci.yml` | Green on `c062d53` |
 
@@ -105,6 +105,6 @@ means `apps/web/…`.
 
 ## Open items
 
-1. Re-run `pnpm eval --real --judge` with an embedding key too. Then look into the low judge scores on `gap-01`, `gap-02` and `fit-03`, whose answers read as grounded, and decide whether `injection-01` should expect `off_topic`.
+1. Fix the faithfulness judge. It rewrites "you're missing X" statements as "Jordan has X" and rejects them, which drives gap and fit answers toward 0 (see `evals/report-real.md`). Then re-run `pnpm eval --real --judge` with an embedding key too.
 2. Run `docker compose up --build` from a fresh clone on a normal machine.
 3. Run an automated accessibility check (for example axe in the Playwright test).
