@@ -127,6 +127,27 @@ describe("POST /chat", () => {
     expect(answer).toContain("not found in your documents");
   });
 
+  it("when the model stream dies mid-answer, sends a clean error and saves nothing", async () => {
+    const base = fakeLlm();
+    const llm: LLM = {
+      ...base,
+      stream: async function* () {
+        yield "You are missing ";
+        yield "Kubernetes ";
+        yield "and ";
+        throw new Error("upstream connection reset");
+      },
+    };
+    const { app, deps } = await seeded({ llm });
+    const { events, answer, sessionId } = await ask(app, "What skills am I missing for Job #1?");
+
+    expect(answer).toBe("You are missing Kubernetes and ");
+    expect(events.at(-1)).toEqual({ type: "error", message: "Sorry, something went wrong while answering. Please try again." });
+    expect(events.some((e) => e.type === "done" || e.type === "citations")).toBe(false);
+    // Nothing half-finished in history, so Retry asks the question afresh.
+    expect(await deps.store.listMessages(sessionId)).toEqual([]);
+  });
+
   it("persists the conversation and sends earlier turns as history", async () => {
     const { llm, prompts } = recording();
     const { app, deps } = await seeded({ llm });
