@@ -19,7 +19,7 @@ Embeddings were in demo mode because no embedding key was set. There's also a
 | | |
 | --- | --- |
 | ![Skill gaps answer with citations, and the cited resume passage highlighted in the evidence panel](docs/screenshots/03-gaps-with-evidence.png) | ![Fit matrix for one job: must-haves marked met, partial or missing, with an overall bar](docs/screenshots/05-fit-matrix.png) |
-| **Skill gaps.** "What skills am I missing for Job #2?" Every claim cites a chunk; clicking a citation highlights it. The job contains a planted prompt injection, which the answer flags and ignores. | **Fit matrix.** Each requirement is met, partial or missing, with the evidence behind it. |
+| **Skill gaps.** "What skills am I missing for Job #2?" Every claim cites a chunk; clicking a citation highlights it. | **Fit matrix.** Each requirement is met, partial or missing, with the evidence behind it. |
 | ![Experience alignment answer with numbered sources](docs/screenshots/04-alignment.png) | ![Requirements compared across three jobs](docs/screenshots/06-compare-jobs.png) |
 | **Alignment.** "How does my experience align with Job #1?" | **Compare jobs.** Shared requirements across all jobs. |
 | ![Interview preparation answer](docs/screenshots/07-interview-prep.png) | ![Evidence opening as a drawer at tablet width](docs/screenshots/08-tablet-evidence-drawer.png) |
