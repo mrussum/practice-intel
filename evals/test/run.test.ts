@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { checkAnswer, checkFitNotInflated, checkIntent, checkRetrieval, groundedness, scoreClaims, totalCostUsd } from "../run.js";
 
-const base = { id: "x", question: "q", expectIntent: ["gaps" as const], expectDocs: [], forbidDocs: [], mustMention: [], mustNotMention: [], before: [], realOnly: false };
+const base = { id: "x", question: "q", expectIntent: ["gaps" as const], expectDocs: [], forbidDocs: [], mustMention: [], mustNotMention: [], mustMentionOneOf: [], before: [], realOnly: false };
 
 describe("eval scoring", () => {
   it("intent passes when the router picks any of the accepted labels", () => {
@@ -52,4 +52,11 @@ describe("eval scoring", () => {
     expect(totalCostUsd([u("claude-haiku-4-5")])).toBeCloseTo(1.5);
     expect(totalCostUsd([u("claude-haiku-4-5"), u("fake")])).toBeNull();
   });
+
+  it("mustMentionOneOf passes when any one phrase appears", () => {
+    const c = { ...base, mustMentionOneOf: ["not found in your documents", "not mentioned"] };
+    expect(checkAnswer(c, "Rust is not mentioned anywhere in your resume.").ok).toBe(true);
+    expect(checkAnswer(c, "You used Rust at Brightpath.")).toEqual({ ok: false, notes: ["mentions none of: not found in your documents / not mentioned"] });
+  });
 });
+

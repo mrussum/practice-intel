@@ -45,6 +45,8 @@ const GoldenCase = z.object({
   forbidDocs: z.array(z.string()).default([]),
   mustMention: z.array(z.string()).default([]),
   mustNotMention: z.array(z.string()).default([]),
+  // At least one of these must appear: for meaning that can be worded several ways.
+  mustMentionOneOf: z.array(z.string()).default([]),
   // Earlier questions asked in the same session; only the last answer is scored.
   before: z.array(z.string()).default([]),
   // Job label whose fit matrix must not mark any must-have requirement "met".
@@ -110,8 +112,10 @@ export function checkAnswer(c: GoldenCase, answer: string): { ok: boolean; notes
   const text = answer.toLowerCase();
   const missing = c.mustMention.filter((m) => !text.includes(m.toLowerCase()));
   const forbidden = c.mustNotMention.filter((m) => text.includes(m.toLowerCase()));
+  const noneOf = c.mustMentionOneOf.length > 0 && !c.mustMentionOneOf.some((m) => text.includes(m.toLowerCase()));
   const notes = [
     ...(missing.length ? [`missing mention: ${missing.join(", ")}`] : []),
+    ...(noneOf ? [`mentions none of: ${c.mustMentionOneOf.join(" / ")}`] : []),
     ...(forbidden.length ? [`forbidden mention: ${forbidden.join(", ")}`] : []),
   ];
   return { ok: notes.length === 0, notes };
