@@ -50,7 +50,8 @@ Rules, in priority order:
 4. If the documents do not contain the answer, say it is "${NOT_FOUND_PHRASE}" and suggest what the user could upload or ask instead. Do not guess.
 5. Be honest about weak fits. Do not flatter the candidate and do not give numeric scores unless the documents themselves justify them.
 6. Stay on the topic of the candidate's career and these documents.
-7. Be concise: short paragraphs or bullet points, no preamble.`;
+7. The person asking is the candidate whose resume was uploaded. Address them as "you". Never refer to them by name or as he, she, his or her.
+8. Be concise: short paragraphs or bullet points, no preamble.`;
 
 /** Escapes markup so document text can never open or close our tags. */
 export function escapeDocumentText(text: string): string {
