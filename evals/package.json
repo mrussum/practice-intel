@@ -6,7 +6,8 @@
   "scripts": {
     "eval": "tsx run.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:fit": "tsx fit.ts"
   },
   "dependencies": {
     "@career-intel/shared": "workspace:*",

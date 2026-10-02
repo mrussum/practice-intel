@@ -1,0 +1,165 @@
+{
+  "_readme": "Your own judgement of the fixture resume (fixtures/resume-jordan-ellis.md) against each requirement. Replace every TODO with met, partial or missing, judging only from the resume text. pnpm eval:fit compares the app's fit matrix with these labels. Leave TODO to skip a requirement.",
+  "job-1-ledgerline-backend.md": [
+    {
+      "skill": "TypeScript",
+      "priority": "must",
+      "requirement": "4+ years building production backend services",
+      "label": "TODO"
+    },
+    {
+      "skill": "Node.js",
+      "priority": "must",
+      "requirement": "deep experience with services under sustained load",
+      "label": "TODO"
+    },
+    {
+      "skill": "PostgreSQL",
+      "priority": "must",
+      "requirement": "schema design, query tuning and safe migrations",
+      "label": "TODO"
+    },
+    {
+      "skill": "AWS",
+      "priority": "must",
+      "requirement": "running production workloads (ECS, RDS or similar)",
+      "label": "TODO"
+    },
+    {
+      "skill": "Terraform",
+      "priority": "must",
+      "requirement": "infrastructure as code for all environments",
+      "label": "TODO"
+    },
+    {
+      "skill": "Mentoring",
+      "priority": "must",
+      "requirement": "supporting and reviewing the work of other engineers",
+      "label": "TODO"
+    },
+    {
+      "skill": "Kafka",
+      "priority": "nice",
+      "requirement": "event-driven architectures",
+      "label": "TODO"
+    },
+    {
+      "skill": "Payments",
+      "priority": "nice",
+      "requirement": "experience in payments or financial systems",
+      "label": "TODO"
+    },
+    {
+      "skill": "GraphQL",
+      "priority": "nice",
+      "requirement": "designing public APIs",
+      "label": "TODO"
+    }
+  ],
+  "job-2-northwind-platform.md": [
+    {
+      "skill": "Kubernetes",
+      "priority": "must",
+      "requirement": "operating production clusters (EKS or GKE), including upgrades and incident response",
+      "label": "TODO"
+    },
+    {
+      "skill": "Terraform",
+      "priority": "must",
+      "requirement": "managing cloud infrastructure as code",
+      "label": "TODO"
+    },
+    {
+      "skill": "AWS",
+      "priority": "must",
+      "requirement": "networking, IAM and managed services",
+      "label": "TODO"
+    },
+    {
+      "skill": "Go",
+      "priority": "must",
+      "requirement": "writing operators, controllers or internal tooling",
+      "label": "TODO"
+    },
+    {
+      "skill": "Observability",
+      "priority": "must",
+      "requirement": "Prometheus, Grafana or OpenTelemetry in production",
+      "label": "TODO"
+    },
+    {
+      "skill": "CI/CD",
+      "priority": "must",
+      "requirement": "designing pipelines used by many teams",
+      "label": "TODO"
+    },
+    {
+      "skill": "Docker",
+      "priority": "nice",
+      "requirement": "building minimal, secure images",
+      "label": "TODO"
+    },
+    {
+      "skill": "PostgreSQL",
+      "priority": "nice",
+      "requirement": "operating managed databases",
+      "label": "TODO"
+    },
+    {
+      "skill": "Helm",
+      "priority": "nice",
+      "requirement": "packaging services for Kubernetes",
+      "label": "TODO"
+    }
+  ],
+  "job-3-lumen-ml.md": [
+    {
+      "skill": "Python",
+      "priority": "must",
+      "requirement": "production ML code, packaging and testing",
+      "label": "TODO"
+    },
+    {
+      "skill": "PyTorch",
+      "priority": "must",
+      "requirement": "training and fine-tuning deep learning models",
+      "label": "TODO"
+    },
+    {
+      "skill": "MLOps",
+      "priority": "must",
+      "requirement": "model versioning, deployment and drift monitoring",
+      "label": "TODO"
+    },
+    {
+      "skill": "Statistics",
+      "priority": "must",
+      "requirement": "experimental design, calibration and model evaluation",
+      "label": "TODO"
+    },
+    {
+      "skill": "Spark",
+      "priority": "must",
+      "requirement": "large-scale data processing pipelines",
+      "label": "TODO"
+    },
+    {
+      "skill": "Healthcare data",
+      "priority": "must",
+      "requirement": "working with sensitive data under GDPR or HIPAA",
+      "label": "TODO"
+    },
+    {
+      "skill": "Kubernetes",
+      "priority": "nice",
+      "requirement": "serving models at scale",
+      "label": "TODO"
+    },
+    {
+      "skill": "AWS",
+      "priority": "nice",
+      "requirement": "SageMaker or similar managed ML services",
+      "label": "TODO"
+    }
+  ]
+}
