@@ -92,15 +92,26 @@ export function groundedness(answer: string, contextRefs: Set<string>): number |
   return markers.filter((m) => contextRefs.has(m)).length / markers.length;
 }
 
-const JudgeOutput = z.object({ score: z.number().min(0).max(1), unsupportedClaims: z.array(z.string()) });
+const JudgeOutput = z.object({
+  claims: z.array(z.object({ claim: z.string(), supported: z.boolean(), reason: z.string() })),
+});
 
-async function judge(deps: Deps, answer: string, ctx: AnswerContext): Promise<z.infer<typeof JudgeOutput>> {
+const JUDGE_SYSTEM = `You check whether an answer about a candidate's resume and job descriptions is faithful to its context.
+
+1. Split the answer into its factual claims. Quote each claim as the answer states it, keeping negations: "Kubernetes is not in your resume" stays a claim about absence, never "the candidate has Kubernetes". Skip advice, suggestions and opinions that state no fact.
+2. Mark each claim supported or not:
+   - Supported: the context states it or it follows directly. Profiles summarise the same documents and count as support.
+   - A claim that something is absent ("not found in your documents", "no evidence of X", "the resume doesn't mention X") is supported when the context doesn't show X for that document, and unsupported when it does.
+   - Unsupported: the context doesn't say it, or contradicts it (for example a skill attributed to the wrong employer).
+3. Give a one-line reason for each claim.`;
+
+/** Faithfulness = share of the answer's claims the context supports, per the judge. */
+async function judge(deps: Deps, answer: string, ctx: AnswerContext): Promise<{ score: number; unsupportedClaims: string[] }> {
   const context = ctx.refs.map((r) => ({ ref: r.ref, text: r.text }));
   const { data } = await structured(deps.llm, {
     task: "judge",
     role: "fast",
-    system:
-      "You grade whether an answer is faithful to its context. Score 1 if every factual claim is supported by the context chunks, 0 if none are. List unsupported claims. Profiles are summaries of the same documents and count as support.",
+    system: JUDGE_SYSTEM,
     prompt: `<context>\n${context.map((c) => `<chunk ref="${c.ref}">${c.text}</chunk>`).join("\n")}\n${ctx.documents
       .filter((d) => d.profile)
       .map((d) => `<profile label="${d.label}">${JSON.stringify(d.profile)}</profile>`)
@@ -108,7 +119,15 @@ async function judge(deps: Deps, answer: string, ctx: AnswerContext): Promise<z.
     schema: JudgeOutput,
     input: { answer, context },
   });
-  return data;
+  return scoreClaims(data.claims);
+}
+
+export function scoreClaims(claims: { claim: string; supported: boolean; reason: string }[]): { score: number; unsupportedClaims: string[] } {
+  const unsupported = claims.filter((c) => !c.supported);
+  return {
+    score: claims.length ? (claims.length - unsupported.length) / claims.length : 1,
+    unsupportedClaims: unsupported.map((c) => `${c.claim} — ${c.reason}`),
+  };
 }
 
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;

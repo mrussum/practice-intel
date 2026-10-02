@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAnswer, checkIntent, checkRetrieval, groundedness } from "../run.js";
+import { checkAnswer, checkIntent, checkRetrieval, groundedness, scoreClaims } from "../run.js";
 
 const base = { id: "x", question: "q", expectIntent: ["gaps" as const], expectDocs: [], forbidDocs: [], mustMention: [], mustNotMention: [] };
 
@@ -29,5 +29,14 @@ describe("eval scoring", () => {
   it("groundedness is the share of citation markers that were in context", () => {
     expect(groundedness("a [C1] b [C2] c [C9] d [C1]", new Set(["C1", "C2"]))).toBe(0.75);
     expect(groundedness("no citations", new Set(["C1"]))).toBeNull();
+  });
+
+  it("faithfulness is the share of supported claims, listing the rest with reasons", () => {
+    const out = scoreClaims([
+      { claim: "Kubernetes is not in your resume", supported: true, reason: "no mention" },
+      { claim: "Kafka was used at Brightpath", supported: false, reason: "Kafka is at Parcelly" },
+    ]);
+    expect(out).toEqual({ score: 0.5, unsupportedClaims: ["Kafka was used at Brightpath — Kafka is at Parcelly"] });
+    expect(scoreClaims([]).score).toBe(1);
   });
 });

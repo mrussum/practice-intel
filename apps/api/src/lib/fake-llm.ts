@@ -242,8 +242,9 @@ function respond<K extends LlmTask>(req: CompleteRequest<K>): string {
     case "judge": {
       const { answer } = input as TaskInputs["judge"];
       const sentences = answer.split(/\n|(?<=[.!?])\s+/).filter((s) => s.trim().length > 20);
-      const cited = sentences.filter((s) => /\[C\d+\]/.test(s)).length;
-      return JSON.stringify({ score: sentences.length ? cited / sentences.length : 1, unsupportedClaims: [] });
+      // Heuristic stand-in: a sentence with a citation counts as a supported claim.
+      const claims = sentences.map((s) => ({ claim: s.trim(), supported: /\[C\d+\]/.test(s), reason: "fake judge: citation present or not" }));
+      return JSON.stringify({ claims });
     }
     case "answer":
       return fakeAnswer(input as TaskInputs["answer"]);
