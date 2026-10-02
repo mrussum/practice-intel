@@ -85,6 +85,20 @@ export function memoryStore(): Store {
       }
     },
 
+    async deleteUser(userId) {
+      if (!users.delete(userId)) return false;
+      for (const d of userDocs(userId)) remove(userId, d.id);
+      for (const [id, s] of sessions) {
+        if (s.userId === userId) {
+          sessions.delete(id);
+          messages.delete(id);
+        }
+      }
+      for (const [hash, s] of authSessions) if (s.userId === userId) authSessions.delete(hash);
+      jobsCreated.delete(userId);
+      return true;
+    },
+
     async insertDocument(userId, doc) {
       if (doc.kind === "resume") {
         for (const d of userDocs(userId)) if (d.kind === "resume") remove(userId, d.id);

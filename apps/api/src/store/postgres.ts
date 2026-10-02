@@ -91,6 +91,12 @@ export function postgresStore(url: string): Store {
       await db.delete(userSessions).where(and(eq(userSessions.userId, userId), lte(userSessions.expiresAt, sql`now()`)));
     },
 
+    async deleteUser(userId) {
+      // Every user-owned table cascades from users, so one delete is atomic.
+      const rows = await db.delete(users).where(eq(users.id, userId)).returning({ id: users.id });
+      return rows.length > 0;
+    },
+
     async insertDocument(userId, doc) {
       const id = await db.transaction(async (tx) => {
         // Serialises label assignment for this user's concurrent uploads.

@@ -147,4 +147,16 @@ describe.skipIf(!enabled)("postgresStore (integration)", () => {
     expect((await store.listMessages(id)).map((m) => m.role)).toEqual(["user", "assistant"]);
     expect(await store.getOrCreateSession(alice, id)).toMatchObject({ summary: "greeted", summarizedCount: 2 });
   });
+
+  it("deletes a user with everything they own, leaving other users alone", async () => {
+    const bobDocs = (await store.listDocuments(bob)).length;
+    const [aliceDoc] = await store.listDocuments(alice);
+    expect(await store.deleteUser(alice)).toBe(true);
+    expect(await store.listDocuments(alice)).toEqual([]);
+    expect(await store.getChunks(alice, aliceDoc!.id)).toEqual([]);
+    expect(await store.findUserByEmail("alice@example.com")).toBeNull();
+    expect(await store.deleteUser(alice)).toBe(false);
+    expect(await store.listDocuments(bob)).toHaveLength(bobDocs);
+  });
 });
+
