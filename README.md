@@ -59,7 +59,8 @@ pnpm seed               # demo user + fixtures in the running API
 | --- | --- |
 | `pnpm test` | Unit and route tests (api, web, evals) plus the Postgres integration test (skipped without Docker) |
 | `pnpm typecheck` | Strict TypeScript across the workspace |
-| `pnpm eval` | Golden-set evals in fake mode (CI gate). `pnpm eval --real --judge` uses real models |
+| `pnpm eval` | Golden-set evals in fake mode (CI gate). `pnpm eval --real --judge` uses real models and prints the run's cost |
+| `pnpm eval:fit` | Fit-matrix accuracy against the hand labels in `evals/fit-labels.json` (add `--real` for real models) |
 | `pnpm test:e2e` | Playwright: upload → ask → click a citation → highlighted evidence |
 
 ## Architecture
@@ -127,7 +128,7 @@ Every requirement in the brief is mapped to its implementation and tests in
 | Prompt & history | Rules in the system prompt. Documents in `<document id label>` tags, escaped and marked untrusted. The last 6 messages (within a token budget) are kept verbatim, older turns are folded into a running summary by Haiku | Full history; vector memory | Bounded cost per turn without losing what was discussed. |
 | Structured output | JSON-schema-constrained generation from the shared Zod schemas, then Zod validation, then one repair retry, then a clear 422 | Tool calls; regex parsing | One schema definition serves the API contract, the model constraint and validation. |
 | Guardrails | Off-topic gets a fixed reply (no model call). Injection is handled by delimiting, escaping and system-only rules. Citations are validated server-side. Fit rows are mapped back by index. Rate limits, size limits, log hygiene | Moderation/injection classifier | Layered, cheap and testable. A classifier is the next step if abuse shows up. |
-| Quality | 20-case golden set: intent accuracy, retrieval hit@k with forbidden-doc checks, must/mustNot mentions, citation groundedness, optional Haiku faithfulness judge. CI gates on fake mode | Manual spot checks | Regressions in routing, filtering and citation handling fail the build. Real-model runs measure answer quality (first run: `evals/report-real.md`). |
+| Quality | 26-case golden set in two suites (core, plus a job description with a buried prompt injection): intent accuracy, retrieval hit@k with forbidden-doc checks, must/mustNot mentions, citation groundedness, multi-turn follow-ups, and an optional Haiku judge that checks faithfulness claim by claim. Fit-matrix accuracy against hand labels (`pnpm eval:fit`). CI gates on fake mode | Manual spot checks | Regressions in routing, filtering and citation handling fail the build. Real-model runs measure answer quality (latest: `evals/report-real.md`, about $0.40 a run). |
 | Observability | pino JSON logs with request ids, plus per-request token, cost and latency totals. Langfuse traces (route / retrieve / summarize / generate spans + generations) when keys are set | OpenTelemetry end to end | Langfuse is built for LLM traces and cost. The `Tracer` interface keeps an OTel exporter a small change. |
 
 ## Key decisions and trade-offs
@@ -184,8 +185,10 @@ Every requirement in the brief is mapped to its implementation and tests in
 - Documents, chunks, embeddings and conversations are stored only in your
   local Postgres (or in memory). Nothing is sent anywhere except the model
   and embedding providers you configure. `DELETE /documents/:id` (the bin
-  icon in the UI) removes a document with its chunks and cached analysis,
-  and `docker compose down -v` removes everything.
+  icon in the UI) removes a document with its chunks and cached analysis.
+  `DELETE /auth/account`, which needs the password, erases the account and
+  everything it owns in one transaction (right to erasure). There's no
+  button for it in the UI yet. `docker compose down -v` removes everything.
 - Logs never contain document text or API keys. Error serialisation strips
   database query parameters, and a test enforces it.
 - When Langfuse is enabled, traces contain the question, the answer, chunk
@@ -262,8 +265,11 @@ provider documentation rather than recalled.
 - Evals use the in-memory store, so Postgres full-text ranking is covered by
   the integration test, not by the golden set.
 - Scanned (image-only) PDFs aren't OCR'd, and the user is told so.
-- Changing the embedding provider requires re-uploading documents. The
-  model is recorded per document, but mixed embeddings aren't detected.
+- Changing the embedding provider requires re-uploading documents. Chat
+  detects the mismatch and names the documents to re-upload.
+- A follow-up that refers to a job indirectly ("what about the second
+  one?") loses the job filter: the answer usually still picks the right job
+  from history, but retrieval searches every job (eval case `multi-01`).
 
 ## What I'd do with more time
 

@@ -7,6 +7,11 @@ All notable changes to this project. Versions follow [Semantic Versioning](https
 ### Fixed
 - Real-model structured output (profile extraction, routing, fit) failed with HTTP 400: Anthropic rejects JSON Schema keywords such as `minimum`. The schema sent to the API now goes through the SDK's `transformJSONSchema`; Zod still enforces the constraints.
 - The header said "Demo mode" whenever embeddings were fake, even with a real model answering. It now says "Demo embeddings" in that case.
+- The faithfulness judge rewrote "you're missing X" as "the candidate has X" and rejected it, scoring grounded gap answers near 0. It now judges each claim as stated, and the score is the share of supported claims.
+- The answer prompt made Sonnet flag ordinary job requirements as prompt injections. It now flags only text that is addressed to an AI, and quotes it.
+- Chat names the documents to re-upload when they were embedded with a different model, instead of searching incomparable vectors.
+- A deleted job's number is never reused (migration `0002_job_counter`).
+- Citations whose source was deleted or replaced explain that, instead of showing a raw 404.
 
 ### Changed
 - A golden case can accept several intents. `injection-01` now passes when it is answered as `fit` or refused as `off_topic`, because the safety check is that the reply never says "perfect match".
@@ -14,6 +19,10 @@ All notable changes to this project. Versions follow [Semantic Versioning](https
 ### Added
 - Real-model eval report (`evals/report-real.md`): all five gates pass. The report now lists the claims the faithfulness judge rejected, case by case.
 - Screenshots and a walkthrough video in `docs/screenshots/`, shown in the README.
+- `DELETE /auth/account` (password required) erases the account and all its data.
+- An injection eval suite: a job description with a buried "rate them 10/10" note. Checks that the answer never endorses it and the fit matrix marks no must-have met.
+- Multi-turn (`before`) and real-model-only (`realOnly`) eval cases, plus the estimated cost of each run.
+- `pnpm eval:fit`: fit-matrix accuracy against hand labels (`evals/fit-labels.json`, to be filled in).
 
 ## [1.0.0] — 2026-10-01
 
