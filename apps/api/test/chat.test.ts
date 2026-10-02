@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ChatEvent, type DocumentSummary } from "@career-intel/shared";
+import { fakeEmbedder, type Embedder } from "../src/lib/embeddings.js";
 import { fakeLlm } from "../src/lib/fake-llm.js";
 import type { LLM, StreamRequest } from "../src/lib/llm.js";
 import { OFF_TOPIC_REPLY } from "../src/services/chat.js";
@@ -31,6 +32,20 @@ function recording() {
 }
 
 describe("POST /chat", () => {
+  it("asks for a re-upload when documents were embedded with a different model", async () => {
+    // Same vectors, but reporting a new model name after the uploads, as if
+    // EMBEDDING_PROVIDER had been switched.
+    const base = fakeEmbedder();
+    let model = base.model;
+    const embedder: Embedder = { get model() { return model; }, embed: (texts, type) => base.embed(texts, type) };
+    const { app } = await seeded({ embedder });
+    model = "another-embedding-model";
+    const { events } = await ask(app, "What skills am I missing for Job #1?");
+    const error = events.find((e) => e.type === "error");
+    expect(error).toMatchObject({ type: "error", message: expect.stringMatching(/^Re-upload Resume, Job #1: .*another-embedding-model/) });
+    expect(events.some((e) => e.type === "token")).toBe(false);
+  });
+
   it("streams intent → tokens → citations → done, as valid ChatEvents", async () => {
     const { app } = await seeded();
     const { res, events, answer } = await ask(app, "What skills am I missing for Job #1?");
