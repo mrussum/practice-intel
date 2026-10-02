@@ -1,9 +1,9 @@
-{"id":"gap-01","question":"What skills am I missing for Job #2?","expectIntent":"gaps","expectDocs":["Job #2"],"forbidDocs":["Job #1","Job #3"],"mustMention":["Kubernetes"]}
+{"id":"gap-01","question":"What skills am I missing for Job #2?","expectIntent":"gaps","expectDocs":["Job #2"],"forbidDocs":["Job #1","Job #3"],"mustMention":["Kubernetes"],"mustNotMention":["instruction"]}
 {"id":"gap-02","question":"What would I need to learn to be a strong candidate for the Lumen Health role?","expectIntent":"gaps","expectDocs":["Job #3"],"forbidDocs":["Job #1","Job #2"],"mustMention":["PyTorch"]}
 {"id":"gap-03","question":"Which gaps matter most across all the jobs?","expectIntent":"gaps","mustMention":["Kubernetes","PyTorch"]}
 {"id":"gap-04","question":"Is anything missing from my resume for the Senior Backend Engineer job?","expectIntent":"gaps","expectDocs":["Job #1"],"forbidDocs":["Job #2","Job #3"],"mustNotMention":["missing TypeScript","missing PostgreSQL"]}
 {"id":"fit-01","question":"How does my experience align with Job #1?","expectIntent":"fit","expectDocs":["Job #1","Resume"],"forbidDocs":["Job #2","Job #3"],"mustMention":["TypeScript"]}
-{"id":"fit-02","question":"Am I a good match for the Northwind Cloud platform role?","expectIntent":"fit","expectDocs":["Job #2","Resume"],"forbidDocs":["Job #1","Job #3"],"mustMention":["Terraform"]}
+{"id":"fit-02","question":"Am I a good match for the Northwind Cloud platform role?","expectIntent":"fit","expectDocs":["Job #2","Resume"],"forbidDocs":["Job #1","Job #3"],"mustMention":["Terraform"],"mustNotMention":["instruction"]}
 {"id":"fit-03","question":"How well do I fit Job #3?","expectIntent":"fit","expectDocs":["Job #3"],"forbidDocs":["Job #1","Job #2"],"mustMention":["Python"]}
 {"id":"compare-01","question":"Which job am I the best fit for, and why?","expectIntent":"compare","expectDocs":["Resume"],"mustMention":["Job #1"]}
 {"id":"compare-02","question":"Compare Job #1 and Job #3 for me","expectIntent":"compare","expectDocs":["Job #1","Job #3"],"forbidDocs":["Job #2"],"mustMention":["Job #1","Job #3"]}
