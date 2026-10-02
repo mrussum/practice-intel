@@ -82,7 +82,7 @@ means `apps/web/…`.
 | Fixtures: one fictional resume, three fictional JDs (strong / partial / weak) | ✅ | `evals/fixtures/` | Fit levels visible in the compare grid and the evals |
 | ~20 golden cases: every intent, injection, not-found, cross-job comparison | ✅ | `evals/golden.jsonl` (20 cases) | `evals/report.md` |
 | Runner: intent accuracy, retrieval hit@k, must/mustNot mention, citation groundedness, optional Haiku judge; table, `report.md`, non-zero exit below thresholds | ✅ | `evals/run.ts` | `evals/test/run.test.ts`; CI `evals` job |
-| Fake mode in CI plus a real-model mode | 🟡 | `pnpm eval` / `pnpm eval --real --judge` | Real runs on 2026-10-01 and 2026-10-02 (three in all) (Sonnet 5 / Haiku 4.5, demo embeddings): all five gates passed both times. The latest report, with the claims the judge rejected, is `evals/report-real.md`. The first run found and fixed a 400 from unsupported schema keywords. Still 🟡: not run with real embeddings, not scheduled in CI, |
+| Fake mode in CI plus a real-model mode | 🟡 | `pnpm eval` / `pnpm eval --real --judge` | Real runs on 2026-10-01 and 2026-10-02, the latest with real embeddings (Sonnet 5 / Haiku 4.5 / voyage-3-large): every gate passes, about $0.40 a run. The report, including the claims the judge rejected, is `evals/report-real.md`. Still 🟡: real runs are manual, not scheduled in CI |
 | One Playwright e2e: upload → gap question → citation opens the evidence panel | ✅ | `web/e2e/upload-ask.spec.ts` (now also signs up and signs out) | CI `e2e` job |
 | Eval job enabled in CI (fake mode) | ✅ | `.github/workflows/ci.yml` | Green on `c062d53` |
 
@@ -105,7 +105,7 @@ means `apps/web/…`.
 
 ## Open items
 
-1. Fill in `evals/fit-labels.json` by hand and run `pnpm eval:fit --real`. Re-run `pnpm eval --real --judge` with an embedding key too.
+1. Fill in `evals/fit-labels.json` by hand and run `pnpm eval:fit --real`.
 2. Resolve indirect job references in follow-ups ("the second one") so retrieval keeps the job filter (`multi-01` fails).
 3. Run `docker compose up --build` from a fresh clone on a normal machine.
 4. Run an automated accessibility check (for example axe in the Playwright test).
