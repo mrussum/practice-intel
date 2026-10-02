@@ -33,6 +33,8 @@ export function memoryStore(): Store {
   const sessions = new Map<string, SessionState & { userId: string }>();
   const messages = new Map<string, StoredMessage[]>();
   const fits = new Map<string, FitRow[]>();
+  /** Highest job number issued per user, so deleted numbers aren't reused. */
+  const jobsCreated = new Map<string, number>();
 
   const userDocs = (userId: string) => [...docs.values()].filter((d) => d.userId === userId);
   const clearFits = (userId: string) => userDocs(userId).forEach((d) => fits.delete(d.id));
@@ -87,7 +89,8 @@ export function memoryStore(): Store {
       if (doc.kind === "resume") {
         for (const d of userDocs(userId)) if (d.kind === "resume") remove(userId, d.id);
       }
-      const nextJob = Math.max(0, ...userDocs(userId).map((d) => jobNumber(d.label))) + 1;
+      const nextJob = Math.max(jobsCreated.get(userId) ?? 0, ...userDocs(userId).map((d) => jobNumber(d.label))) + 1;
+      if (doc.kind === "job") jobsCreated.set(userId, nextJob);
       const stored = {
         id: randomUUID(),
         userId,

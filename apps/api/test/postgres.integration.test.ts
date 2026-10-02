@@ -132,6 +132,9 @@ describe.skipIf(!enabled)("postgresStore (integration)", () => {
     expect(await store.getChunks(alice, job2!.id)).toEqual([]);
     await expect(store.putFit(job2!.id, [])).resolves.toBeUndefined();
     expect(await store.deleteDocument(alice, job2!.id)).toBe(false);
+    // Job #2 was the highest; its number is not handed out again.
+    const next = await ingestDocument(deps(), { kind: "job", ...file(alice, SAMPLE_JOB, "c.md") });
+    expect(next.document.label).toBe("Job #3");
   });
 
   it("persists chat sessions per user and refuses another user's session id", async () => {

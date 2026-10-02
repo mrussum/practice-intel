@@ -22,6 +22,8 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   /** scrypt$N$r$p$salt$hash: parameters travel with the hash (see lib/auth.ts). */
   passwordHash: text("password_hash").notNull(),
+  /** Highest job number ever issued, so a deleted "Job #3" is never reused for a different job. */
+  jobsCreated: integer("jobs_created").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -104,7 +104,11 @@ export function postgresStore(url: string): Store {
             .select({ label: documents.label })
             .from(documents)
             .where(and(eq(documents.userId, userId), eq(documents.kind, "job")));
-          label = `Job #${Math.max(0, ...labels.map((l) => jobNumber(l.label))) + 1}`;
+          // The counter alone would restart at 1 for accounts that existed before it.
+          const [owner] = await tx.select({ jobsCreated: users.jobsCreated }).from(users).where(eq(users.id, userId));
+          const next = Math.max(owner?.jobsCreated ?? 0, ...labels.map((l) => jobNumber(l.label))) + 1;
+          await tx.update(users).set({ jobsCreated: next }).where(eq(users.id, userId));
+          label = `Job #${next}`;
         }
         const [row] = await tx
           .insert(documents)
