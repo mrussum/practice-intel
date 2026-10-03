@@ -5,55 +5,55 @@
       "skill": "TypeScript",
       "priority": "must",
       "requirement": "4+ years building production backend services",
-      "label": "TODO"
+      "label": "met"
     },
     {
       "skill": "Node.js",
       "priority": "must",
       "requirement": "deep experience with services under sustained load",
-      "label": "TODO"
+      "label": "met"
     },
     {
       "skill": "PostgreSQL",
       "priority": "must",
       "requirement": "schema design, query tuning and safe migrations",
-      "label": "TODO"
+      "label": "met"
     },
     {
       "skill": "AWS",
       "priority": "must",
       "requirement": "running production workloads (ECS, RDS or similar)",
-      "label": "TODO"
+      "label": "met"
     },
     {
       "skill": "Terraform",
       "priority": "must",
       "requirement": "infrastructure as code for all environments",
-      "label": "TODO"
+      "label": "met"
     },
     {
       "skill": "Mentoring",
       "priority": "must",
       "requirement": "supporting and reviewing the work of other engineers",
-      "label": "TODO"
+      "label": "met"
     },
     {
       "skill": "Kafka",
       "priority": "nice",
       "requirement": "event-driven architectures",
-      "label": "TODO"
+      "label": "met"
     },
     {
       "skill": "Payments",
       "priority": "nice",
       "requirement": "experience in payments or financial systems",
-      "label": "TODO"
+      "label": "met"
     },
     {
       "skill": "GraphQL",
       "priority": "nice",
       "requirement": "designing public APIs",
-      "label": "TODO"
+      "label": "partial"
     }
   ],
   "job-2-northwind-platform.md": [
@@ -61,55 +61,55 @@
       "skill": "Kubernetes",
       "priority": "must",
       "requirement": "operating production clusters (EKS or GKE), including upgrades and incident response",
-      "label": "TODO"
+      "label": "missing"
     },
     {
       "skill": "Terraform",
       "priority": "must",
       "requirement": "managing cloud infrastructure as code",
-      "label": "TODO"
+      "label": "met"
     },
     {
       "skill": "AWS",
       "priority": "must",
       "requirement": "networking, IAM and managed services",
-      "label": "TODO"
+      "label": "partial"
     },
     {
       "skill": "Go",
       "priority": "must",
       "requirement": "writing operators, controllers or internal tooling",
-      "label": "TODO"
+      "label": "missing"
     },
     {
       "skill": "Observability",
       "priority": "must",
       "requirement": "Prometheus, Grafana or OpenTelemetry in production",
-      "label": "TODO"
+      "label": "partial"
     },
     {
       "skill": "CI/CD",
       "priority": "must",
       "requirement": "designing pipelines used by many teams",
-      "label": "TODO"
+      "label": "partial"
     },
     {
       "skill": "Docker",
       "priority": "nice",
       "requirement": "building minimal, secure images",
-      "label": "TODO"
+      "label": "partial"
     },
     {
       "skill": "PostgreSQL",
       "priority": "nice",
       "requirement": "operating managed databases",
-      "label": "TODO"
+      "label": "met"
     },
     {
       "skill": "Helm",
       "priority": "nice",
       "requirement": "packaging services for Kubernetes",
-      "label": "TODO"
+      "label": "missing"
     }
   ],
   "job-3-lumen-ml.md": [
@@ -117,49 +117,49 @@
       "skill": "Python",
       "priority": "must",
       "requirement": "production ML code, packaging and testing",
-      "label": "TODO"
+      "label": "partial"
     },
     {
       "skill": "PyTorch",
       "priority": "must",
       "requirement": "training and fine-tuning deep learning models",
-      "label": "TODO"
+      "label": "missing"
     },
     {
       "skill": "MLOps",
       "priority": "must",
       "requirement": "model versioning, deployment and drift monitoring",
-      "label": "TODO"
+      "label": "missing"
     },
     {
       "skill": "Statistics",
       "priority": "must",
       "requirement": "experimental design, calibration and model evaluation",
-      "label": "TODO"
+      "label": "missing"
     },
     {
       "skill": "Spark",
       "priority": "must",
       "requirement": "large-scale data processing pipelines",
-      "label": "TODO"
+      "label": "partial"
     },
     {
       "skill": "Healthcare data",
       "priority": "must",
       "requirement": "working with sensitive data under GDPR or HIPAA",
-      "label": "TODO"
+      "label": "missing"
     },
     {
       "skill": "Kubernetes",
       "priority": "nice",
       "requirement": "serving models at scale",
-      "label": "TODO"
+      "label": "missing"
     },
     {
       "skill": "AWS",
       "priority": "nice",
       "requirement": "SageMaker or similar managed ML services",
-      "label": "TODO"
+      "label": "partial"
     }
   ]
 }
