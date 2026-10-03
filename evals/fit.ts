@@ -42,6 +42,8 @@ export interface FitScore {
   correct: number;
   /** Labelled missing, predicted met: the error that would mislead a candidate. */
   missingCalledMet: string[];
+  /** Requirements where the app and the hand label differ, for reading. */
+  disagreements: string[];
   confusion: Record<Status, Record<Status, number>>;
   unmatchedLabels: string[];
   unlabelledPredictions: string[];
@@ -57,7 +59,7 @@ const sameSkill = (a: string, b: string) => {
 export function scoreFit(labels: { skill: string; label: Status | "TODO" }[], predictions: Prediction[]): FitScore {
   const statuses = FitStatus.options;
   const confusion = Object.fromEntries(statuses.map((l) => [l, Object.fromEntries(statuses.map((p) => [p, 0]))])) as FitScore["confusion"];
-  const score: FitScore = { compared: 0, correct: 0, missingCalledMet: [], confusion, unmatchedLabels: [], unlabelledPredictions: [], todo: 0 };
+  const score: FitScore = { compared: 0, correct: 0, missingCalledMet: [], disagreements: [], confusion, unmatchedLabels: [], unlabelledPredictions: [], todo: 0 };
   const used = new Set<number>();
   for (const l of labels) {
     if (l.label === "TODO") {
@@ -73,6 +75,7 @@ export function scoreFit(labels: { skill: string; label: Status | "TODO" }[], pr
     const predicted = predictions[i]!.status;
     score.compared++;
     if (predicted === l.label) score.correct++;
+    else score.disagreements.push(`${l.skill}: labelled ${l.label}, app said ${predicted}`);
     if (l.label === "missing" && predicted === "met") score.missingCalledMet.push(l.skill);
     confusion[l.label][predicted]++;
   }
@@ -130,6 +133,7 @@ async function main() {
       "| --- | " + statuses.map(() => "---").join(" | ") + " |",
       ...statuses.map((l) => `| ${l} | ${statuses.map((p) => s.confusion[l][p]).join(" | ")} |`),
       "",
+      ...(s.disagreements.length ? ["Disagreements:", "", ...s.disagreements.map((d) => `- ${d}`), ""] : []),
       ...(s.unmatchedLabels.length ? [`Labels with no matching requirement: ${s.unmatchedLabels.join(", ")}`, ""] : []),
       ...(s.unlabelledPredictions.length ? [`Requirements the app extracted that have no label: ${s.unlabelledPredictions.join(", ")}`, ""] : []),
     );
