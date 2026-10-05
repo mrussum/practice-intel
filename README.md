@@ -4,6 +4,8 @@ I built Career Intel as a take-home project for Newpage. It's a simple idea with
 
 I chose this idea because the answers are relatively easy to check. If the system says, for example, that I have experience with PostgreSQL, there should be something in the CV that supports that claim. That made it a useful project for exploring RAG, citations, evaluation and reliability rather than just building another chatbot so I could showcase some skills and wisdom.
 
+Link to demo: https://www.loom.com/share/e2767b38c8ca4007bceda32e0a433964
+
 ## Screenshots
 
 These screenshots were taken using real Claude responses (Sonnet 5 for answers and fit analysis, and Haiku 4.5 for routing and extraction) against the fictional fixtures in `evals/fixtures`.
@@ -350,15 +352,9 @@ The production environment would use WAF, private subnets for RDS, VPC endpoints
 
 ## How AI tools were used
 
-This project was written with the help of Claude Code.
+This project was written with the help of Claude Code. Claude Code wrote most of the code. My job was deciding what to build, setting the rules it worked within, reviewing its changes, and checking the results against reality rather than trusting green ticks.
 
-I worked from `CLAUDE.md` and built the application in six phases. Each phase started with a written plan in `docs/reference-notes.md` and ended with:
-
-```bash
-pnpm typecheck && pnpm test
-```
-
-passing before committing the changes.
+I worked from `CLAUDE.md` and built the application in phases.
 
 The AI assistant was useful, but it also made mistakes. Several of them were caught through the tests and review process.
 
@@ -393,6 +389,24 @@ A question such as “What benefits does Ledgerline offer?” was initially clas
 The evaluation suite exposed the problem. The fix was a simple application-level rule: if a question explicitly names one of the uploaded jobs, it shouldn't be treated as off-topic.
 
 The general development rules were to use fakes before real providers, run tests with every change, avoid adding dependencies without a reason, and check model IDs against the provider documentation rather than relying on memory.
+
+
+**Rules**
+
+Do's
+
+Write the rules down (CLAUDE.md) instead of repeating them in every prompt.
+Ask for a plan before code, and review the diff, not just the summary.
+Build fakes first, so tests are fast and free, then always run against the real models before trusting results.
+Read the failures in an eval report, not just the score.
+Treat a model-based judge as a model too: check what it rejects.
+
+Don'ts
+
+Don't accept "all tests pass" as proof it works.
+Dont let the assistant add dependencies, or write the reasoning documents, without you.
+Don't let it check its own claims: one screenshot caption it wrote described something the screenshot didnt show.
+Don't keep going just because it's easy; I overbuilt this a bit.
 
 ## Known limitations
 
