@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "eval": "tsx run.ts",
+    "eval": "tsx --env-file-if-exists=../.env run.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:fit": "tsx --env-file-if-exists=../.env fit.ts"
   },
   "dependencies": {
     "@career-intel/shared": "workspace:*",

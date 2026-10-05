@@ -76,6 +76,8 @@ export interface Store {
   deleteAuthSession(tokenHash: string): Promise<void>;
   /** Housekeeping on login: drops the user's expired sessions. */
   deleteExpiredAuthSessions(userId: string): Promise<void>;
+  /** Deletes the account and everything it owns (documents, chunks, chats, fit cache, logins). */
+  deleteUser(userId: string): Promise<boolean>;
 
   // ---- documents (all scoped to one user) ----------------------------------
   /**

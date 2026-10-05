@@ -91,6 +91,12 @@ export function postgresStore(url: string): Store {
       await db.delete(userSessions).where(and(eq(userSessions.userId, userId), lte(userSessions.expiresAt, sql`now()`)));
     },
 
+    async deleteUser(userId) {
+      // Every user-owned table cascades from users, so one delete is atomic.
+      const rows = await db.delete(users).where(eq(users.id, userId)).returning({ id: users.id });
+      return rows.length > 0;
+    },
+
     async insertDocument(userId, doc) {
       const id = await db.transaction(async (tx) => {
         // Serialises label assignment for this user's concurrent uploads.
@@ -104,7 +110,11 @@ export function postgresStore(url: string): Store {
             .select({ label: documents.label })
             .from(documents)
             .where(and(eq(documents.userId, userId), eq(documents.kind, "job")));
-          label = `Job #${Math.max(0, ...labels.map((l) => jobNumber(l.label))) + 1}`;
+          // The counter alone would restart at 1 for accounts that existed before it.
+          const [owner] = await tx.select({ jobsCreated: users.jobsCreated }).from(users).where(eq(users.id, userId));
+          const next = Math.max(owner?.jobsCreated ?? 0, ...labels.map((l) => jobNumber(l.label))) + 1;
+          await tx.update(users).set({ jobsCreated: next }).where(eq(users.id, userId));
+          label = `Job #${next}`;
         }
         const [row] = await tx
           .insert(documents)

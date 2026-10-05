@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { cn } from "../lib/cn";
+import { evidenceErrorMessage, retryUnlessGone } from "../lib/evidence";
 import { Alert } from "./ui/alert";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -24,6 +25,7 @@ export function EvidencePanel({ target, onClose }: { target: EvidenceTarget | nu
     queryKey: ["document", target?.documentId],
     queryFn: () => api.getDocument(target!.documentId),
     enabled: !!target,
+    retry: retryUnlessGone,
   });
   const highlighted = useRef<HTMLElement>(null);
 
@@ -49,7 +51,7 @@ export function EvidencePanel({ target, onClose }: { target: EvidenceTarget | nu
         ) : doc.isLoading ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner /> Loading source…</p>
         ) : doc.error ? (
-          <Alert variant="destructive">{doc.error.message}</Alert>
+          <Alert variant="destructive">{evidenceErrorMessage(doc.error)}</Alert>
         ) : doc.data ? (
           <article aria-label={`${doc.data.label}: ${doc.data.title}`} className="space-y-3">
             <header className="space-y-1">

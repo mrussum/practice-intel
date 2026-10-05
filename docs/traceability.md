@@ -82,7 +82,7 @@ means `apps/web/…`.
 | Fixtures: one fictional resume, three fictional JDs (strong / partial / weak) | ✅ | `evals/fixtures/` | Fit levels visible in the compare grid and the evals |
 | ~20 golden cases: every intent, injection, not-found, cross-job comparison | ✅ | `evals/golden.jsonl` (20 cases) | `evals/report.md` |
 | Runner: intent accuracy, retrieval hit@k, must/mustNot mention, citation groundedness, optional Haiku judge; table, `report.md`, non-zero exit below thresholds | ✅ | `evals/run.ts` | `evals/test/run.test.ts`; CI `evals` job |
-| Fake mode in CI plus a real-model mode | 🟡 | `pnpm eval` / `pnpm eval --real --judge` | Real mode is implemented but has **never been run**: no API keys were available. Fake mode checks plumbing, not answer quality |
+| Fake mode in CI plus a real-model mode | 🟡 | `pnpm eval` / `pnpm eval --real --judge` | Real runs on 2026-10-01 and 2026-10-02, the latest with real embeddings (Sonnet 5 / Haiku 4.5 / voyage-3-large): every gate passes, about $0.40 a run. The report, including the claims the judge rejected, is `evals/report-real.md`. Still 🟡: real runs are manual, not scheduled in CI |
 | One Playwright e2e: upload → gap question → citation opens the evidence panel | ✅ | `web/e2e/upload-ask.spec.ts` (now also signs up and signs out) | CI `e2e` job |
 | Eval job enabled in CI (fake mode) | ✅ | `.github/workflows/ci.yml` | Green on `c062d53` |
 
@@ -101,10 +101,11 @@ means `apps/web/…`.
 | --- | --- | --- |
 | Accounts with per-user isolation (scrypt passwords, httpOnly session cookies, Origin check) | `api/src/lib/auth.ts`, `api/src/routes/auth.ts`, store scoping, `web/src/components/AuthScreen.tsx` | `auth.test.ts`, `auth-routes.test.ts`, `isolation.test.ts`, integration test, e2e |
 | Security headers and CSP on the web container | `web/nginx.conf.template` | Browser checks (outbound fetch and injected script blocked) |
+| Fit-matrix accuracy against hand labels | `evals/fit.ts`, `evals/fit-labels.json` (owner's labels) | `evals/fit-report.md`: 24/26 exact match, no requirement labelled missing was called met (23–24/26 across runs) |
 | Dependency audit in CI and Dependabot; dev tooling upgraded to clear all advisories | `.github/workflows/ci.yml` (`audit`), `.github/dependabot.yml` | `pnpm audit`: no known vulnerabilities |
 
 ## Open items
 
-1. Run `pnpm eval --real --judge` with real keys and tune the thresholds or prompts.
+1. Resolve indirect job references in follow-ups ("the second one") so retrieval keeps the job filter (`multi-01` fails).
 2. Run `docker compose up --build` from a fresh clone on a normal machine.
 3. Run an automated accessibility check (for example axe in the Playwright test).

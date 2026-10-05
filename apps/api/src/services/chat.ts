@@ -73,6 +73,16 @@ export async function* answerQuestion(
   // Same answer for "taken by someone else" as for any unknown resource.
   if (!session) throw new HttpError(404, "session_not_found", "This chat session doesn't exist. Start a new chat.");
   const [docs, messages] = await Promise.all([deps.store.listDocuments(req.userId), deps.store.listMessages(req.sessionId)]);
+  // Vectors from different embedding models aren't comparable: searching them
+  // would return confident nonsense, so ask for a re-upload instead.
+  const stale = docs.filter((d) => d.embeddingModel !== deps.embedder.model);
+  if (stale.length) {
+    throw new HttpError(
+      409,
+      "embedding_model_changed",
+      `Re-upload ${stale.map((d) => d.label).join(", ")}: they were embedded with a different model (${stale[0]!.embeddingModel}) than the app now uses (${deps.embedder.model}).`,
+    );
+  }
 
   const mentioned = resolveMentions(req.message, docs);
   const routed = await step("route", () => routeIntent(deps.llm, req.message, docs.map((d) => d.label)));

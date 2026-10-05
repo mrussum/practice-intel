@@ -132,6 +132,9 @@ describe.skipIf(!enabled)("postgresStore (integration)", () => {
     expect(await store.getChunks(alice, job2!.id)).toEqual([]);
     await expect(store.putFit(job2!.id, [])).resolves.toBeUndefined();
     expect(await store.deleteDocument(alice, job2!.id)).toBe(false);
+    // Job #2 was the highest; its number is not handed out again.
+    const next = await ingestDocument(deps(), { kind: "job", ...file(alice, SAMPLE_JOB, "c.md") });
+    expect(next.document.label).toBe("Job #3");
   });
 
   it("persists chat sessions per user and refuses another user's session id", async () => {
@@ -144,4 +147,16 @@ describe.skipIf(!enabled)("postgresStore (integration)", () => {
     expect((await store.listMessages(id)).map((m) => m.role)).toEqual(["user", "assistant"]);
     expect(await store.getOrCreateSession(alice, id)).toMatchObject({ summary: "greeted", summarizedCount: 2 });
   });
+
+  it("deletes a user with everything they own, leaving other users alone", async () => {
+    const bobDocs = (await store.listDocuments(bob)).length;
+    const [aliceDoc] = await store.listDocuments(alice);
+    expect(await store.deleteUser(alice)).toBe(true);
+    expect(await store.listDocuments(alice)).toEqual([]);
+    expect(await store.getChunks(alice, aliceDoc!.id)).toEqual([]);
+    expect(await store.findUserByEmail("alice@example.com")).toBeNull();
+    expect(await store.deleteUser(alice)).toBe(false);
+    expect(await store.listDocuments(bob)).toHaveLength(bobDocs);
+  });
 });
+

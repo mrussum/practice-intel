@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "jobs_created" integer DEFAULT 0 NOT NULL;

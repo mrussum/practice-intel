@@ -1,253 +1,421 @@
-> **Reference draft.** Written by an AI assistant alongside the reference
-> build, as a starting point. The owner's own reasoning lives in
-> `docs/DECISIONS.md`, and the final README should be rewritten in their words.
-
 # Career Intel
 
-Upload one resume and several job descriptions, then ask how well you fit,
-what you're missing, how the jobs compare and what to prepare for interviews.
-Every answer is grounded in your documents, with numbered citations that open
-the exact source passage.
+I built Career Intel as a take-home project for Newpage. It's a simple idea with plenty in it to do, you upload a CV and a few job descriptions, and then you can ask questions about how well you match the roles, what you're missing, and where your experience lines up etc.
+
+I chose this idea because the answers are relatively easy to check. If the system says, for example, that I have experience with PostgreSQL, there should be something in the CV that supports that claim. That made it a useful project for exploring RAG, citations, evaluation and reliability rather than just building another chatbot so I could showcase some skills and wisdom.
+
+## Screenshots
+
+These screenshots were taken using real Claude responses (Sonnet 5 for answers and fit analysis, and Haiku 4.5 for routing and extraction) against the fictional fixtures in `evals/fixtures`.
+
+Embeddings were running in demo mode because I hadn't provided an embedding API key. There's also a 54-second walkthrough video at [`docs/screenshots/walkthrough.webm`](docs/screenshots/walkthrough.webm).
+
+### Skill gaps
+
+![Skill gaps answer with citations, and the cited CV passage highlighted in the evidence panel](docs/screenshots/03-gaps-with-evidence.png)
+
+“ What skills am I missing for Job #2?”
+
+Every claim in the answer has a citation. Clicking one highlights the relevant section of the uploaded evidence.
+
+### Fit matrix
+
+![Fit matrix: each requirement marked met, partial or missing, with evidence](docs/screenshots/05-fit-matrix.png)
+
+For each requirement, the system decides whether it is met, partially met, or missing, and shows the evidence behind the decision.
+
+### Experience alignment
+
+![Experience alignment answer with numbered sources](docs/screenshots/04-alignment.png)
+
+“How does my experience align with Job #1?”
+
+The answer is backed up with numbered sources from the uploaded documents.
+
+### Compare jobs
+
+![Requirements compared across three jobs](docs/screenshots/06-compare-jobs.png)
+
+The system can also compare several jobs and identify requirements they have in common.
+
+### Interview preparation
+
+![Interview preparation answer](docs/screenshots/07-interview-prep.png)
+
+The interview preparation view suggests likely questions and, importantly, shows what the CV can and can't actually support.
+
+The evidence panel also works at tablet widths, where it opens as a drawer rather than taking up the main screen.
+
+![Evidence opening as a drawer at tablet width](docs/screenshots/08-tablet-evidence-drawer.png)
+
+There are also screenshots for the [sign-in screen](docs/screenshots/01-sign-in.png) and the [main workspace with suggested questions](docs/screenshots/02-workspace.png).
 
 ## Quick start
 
-```bash
-docker compose up --build                     # web: http://localhost:8080  api: http://localhost:3001
-docker compose --profile seed run --rm seed   # optional: demo user + fictional fixtures
-```
-
-Sign up on the login screen. If you ran the seed, log in as
-`demo@example.com` / `demo-password-123`. That works from a clean clone with no keys. The app then runs in **demo
-mode**: deterministic fake AI and embeddings, clearly badged in the UI. For
-real answers:
+The easiest way to run the project is with Docker:
 
 ```bash
-cp .env.example .env    # set ANTHROPIC_API_KEY and VOYAGE_API_KEY (or OPENAI_API_KEY)
 docker compose up --build
+# web: http://localhost:8080
+# api: http://localhost:3001
+
+docker compose --profile seed run --rm seed
+# optional: creates the demo user and fictional fixtures
 ```
 
-Local development:
+If you ran the seed command, you can sign in with:
+
+`demo@example.com`
+`demo-password-123`
+
+This works from a clean clone without needing any API keys. The application runs in **demo mode**, which uses deterministic fake AI and embeddings and is clearly labelled in the UI.
+
+For real model responses, create a `.env` file and add the relevant API keys:
 
 ```bash
-cp .env.example .env    # DATABASE_URL points at the compose Postgres; keys optional
-docker compose up db    # Postgres + pgvector
-pnpm install
-pnpm --filter @career-intel/api db:migrate
-pnpm dev                # web :5173, api :3001 (with DATABASE_URL unset, the API uses an in-memory store)
-pnpm seed               # demo user + fixtures in the running API
+cp .env.example .env
 ```
 
-| Command | What it runs |
-| --- | --- |
-| `pnpm test` | Unit and route tests (api, web, evals) plus the Postgres integration test (skipped without Docker) |
-| `pnpm typecheck` | Strict TypeScript across the workspace |
-| `pnpm eval` | Golden-set evals in fake mode (CI gate). `pnpm eval --real --judge` uses real models |
-| `pnpm test:e2e` | Playwright: upload → ask → click a citation → highlighted evidence |
+Then set `ANTHROPIC_API_KEY` and `VOYAGE_API_KEY` (or `OPENAI_API_KEY`) before starting the application.
+
+## Local development
+
+For local development:
+
+```bash
+cp .env.example .env
+# DATABASE_URL points at the Postgres instance from Docker.
+# API keys are optional.
+
+docker compose up db
+
+pnpm install
+
+pnpm --filter @career-intel/api db:migrate
+
+pnpm dev
+# web: 5173
+# api: 3001
+```
+
+If `DATABASE_URL` isn't set, the API falls back to an in-memory store.
+
+To load the demo user and fixtures:
+
+```bash
+pnpm seed
+```
+
+### Useful commands
+
+| Command                    | What it does                                                                                                |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `pnpm test`                | Runs the unit, route, web and evaluation tests, plus the Postgres integration test when Docker is available |
+| `pnpm typecheck`           | Runs strict TypeScript checking across the workspace                                                        |
+| `pnpm eval`                | Runs the golden-set evaluations in fake mode                                                                |
+| `pnpm eval --real --judge` | Runs the evaluations against real models and reports the cost                                               |
+| `pnpm eval:fit`            | Checks fit-matrix accuracy against the hand-labelled results                                                |
+| `pnpm test:e2e`            | Runs the Playwright journey: upload → ask → click citation → view highlighted evidence                      |
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  subgraph Browser
-    UI["React + TanStack Query<br/>Documents · Chat · Evidence<br/>Fit matrix · Compare"]
-  end
-  subgraph API["Fastify API"]
-    Upload["POST /documents<br/>parse → chunk → embed → extract"]
-    Chat["POST /chat (SSE)<br/>route → retrieve → prompt → stream → cite"]
-    Fit["GET /jobs/:id/fit<br/>cached per job"]
-    LLM["lib/llm.ts<br/>(Anthropic | fake)"]
-    Emb["lib/embeddings.ts<br/>(Voyage | OpenAI | fake)"]
-  end
-  PG[("Postgres 16<br/>pgvector + tsvector")]
-  Claude["Claude<br/>Sonnet: answers, fit<br/>Haiku: routing, extraction"]
-  Voyage["Embeddings API"]
-  LF["Langfuse<br/>(optional)"]
+At a high level, the application has a React frontend, a Fastify API and Postgres with pgvector.
 
-  UI -- multipart --> Upload
-  UI -- SSE --> Chat
-  UI --> Fit
-  Upload --> Emb --> Voyage
-  Upload --> LLM
-  Chat --> LLM --> Claude
-  Chat --> Emb
-  Fit --> LLM
-  Upload & Chat & Fit --> PG
-  Chat -. traces .-> LF
-```
+The main flow is:
 
-**Upload:** the file is type-checked (extension + magic bytes, 5MB), parsed
-(unpdf / mammoth / UTF-8) and split into structural chunks (a job entry, a
-requirements block), not fixed-size windows. Chunks are embedded in batches.
-In parallel, Haiku extracts a typed profile (`JobProfile` with must/nice
-requirements, or a resume skills-and-evidence profile), validated by Zod with
-one repair retry. Everything is written in one transaction.
+**Browser → API → retrieval/LLM → Postgres → response with citations**
 
-**Question:** Haiku classifies the intent (fit / gaps / compare /
-interview_prep / general / off_topic). Job mentions ("Job #2", a title, a
-company) become hard filters. Hybrid retrieval runs pgvector cosine and
-Postgres full-text in parallel and merges them with reciprocal rank fusion.
-The prompt builder wraps documents as escaped, untrusted data with short
-chunk refs. Sonnet streams the answer over SSE, and the server keeps only
-citations that point at chunks it actually supplied.
+The frontend handles documents, chat, the evidence panel, fit matrices and job comparisons.
 
-## RAG / LLM approach
+The API is responsible for document processing, routing questions, retrieval, prompting the model and validating citations.
 
-| Area | Choice | Alternatives considered | Why |
-| --- | --- | --- | --- |
-| LLM | Claude Sonnet 5 for answers and fit analysis; Haiku 4.5 for routing, extraction, summaries and the eval judge (all env-configurable) | One model for everything | Routing and extraction are high-volume, schema-bound tasks where the cheaper, faster model is enough. The user-facing reasoning gets the stronger model. |
-| Embeddings | Voyage `voyage-3-large` at 1024 dims (OpenAI `text-embedding-3-small` at 1024 as an alternative) | Local sentence-transformers | Strong retrieval quality, and no model hosting to run. A fixed 1024-dim column means switching providers only takes a re-ingest. |
-| Vector store | Postgres + pgvector (HNSW, cosine) | Pinecone, Qdrant, Chroma | One database for documents, chunks, full-text, sessions and caches. It gives transactions and cascading deletes, and costs nothing extra to operate at this scale. |
-| Orchestration | Plain TypeScript: small modules plus one `LLM` interface | LangChain / LlamaIndex | The pipeline is only a handful of steps. Owning it keeps prompts and control flow reviewable and testable, with no framework churn. |
-| Chunking | Structure-aware (headings → sections → paragraphs) | Fixed 512-token windows | Resumes and JDs are short and sectioned. Structural chunks keep one role or one requirements block together, which makes both retrieval and citations better. |
-| Retrieval | Hybrid (vector + full-text) with RRF, k=60 | Vector only; learned re-ranker | Full-text catches exact tokens ("Go", "SOC 2") that embeddings blur. RRF needs no score normalisation. A re-ranker isn't justified by the eval yet. |
-| Context strategy | Per-intent table (`lib/strategy.ts`). Fit/gaps/compare get the full extracted profiles **plus** retrieved evidence | Top-k only | With a small corpus, completeness beats token savings: top-k alone can drop the one requirement a "what am I missing?" answer needs. Profiles are compact, and chunks carry the citations. |
-| Prompt & history | Rules in the system prompt. Documents in `<document id label>` tags, escaped and marked untrusted. The last 6 messages (within a token budget) are kept verbatim, older turns are folded into a running summary by Haiku | Full history; vector memory | Bounded cost per turn without losing what was discussed. |
-| Structured output | JSON-schema-constrained generation from the shared Zod schemas, then Zod validation, then one repair retry, then a clear 422 | Tool calls; regex parsing | One schema definition serves the API contract, the model constraint and validation. |
-| Guardrails | Off-topic gets a fixed reply (no model call). Injection is handled by delimiting, escaping and system-only rules. Citations are validated server-side. Fit rows are mapped back by index. Rate limits, size limits, log hygiene | Moderation/injection classifier | Layered, cheap and testable. A classifier is the next step if abuse shows up. |
-| Quality | 20-case golden set: intent accuracy, retrieval hit@k with forbidden-doc checks, must/mustNot mentions, citation groundedness, optional Haiku faithfulness judge. CI gates on fake mode | Manual spot checks | Regressions in routing, filtering and citation handling fail the build. Real-model runs measure answer quality. |
-| Observability | pino JSON logs with request ids, plus per-request token, cost and latency totals. Langfuse traces (route / retrieve / summarize / generate spans + generations) when keys are set | OpenTelemetry end to end | Langfuse is built for LLM traces and cost. The `Tracer` interface keeps an OTel exporter a small change. |
+Postgres stores the documents, chunks, embeddings, full-text search data, sessions and cached results.
 
-## Key decisions and trade-offs
+Claude is used for the language-model tasks, while Voyage provides embeddings. Langfuse can optionally be enabled for tracing.
 
-1. **Profiles + evidence for analytical questions.** More input tokens per
-   question in exchange for complete answers about requirements. It's
-   revisited when the corpus grows past about 20 documents.
-2. **Fakes are first-class, not mocks.** The fake LLM and embedder are
-   deterministic heuristics over structured inputs, so the whole app,
-   tests, evals and e2e run offline and in CI for free. The trade-off is that
-   fake-mode evals measure plumbing, not answer quality, and the report says
-   so.
-3. **Short citation refs, validated server-side.** Models reproduce `[C3]`
-   more reliably than UUIDs, and the server drops any ref it didn't supply.
-   The UI can therefore never link to evidence that wasn't in the context.
-4. **Synchronous ingestion.** Uploads finish in seconds and the UI shows
-   progress per file. A queue would add infrastructure without a user-visible
-   benefit locally (see the AWS section for when it's worth adding).
-5. **Fit matrix computed once per job and cached** until any document
-   changes. It's the most expensive call, and its output only depends on the
-   documents.
+### Uploading a document
+
+When a document is uploaded, the application first checks its file type and magic bytes and limits it to 5 MB.
+
+The file is then parsed using `unpdf`, `mammoth` or UTF-8 depending on the format. Rather than chopping everything into arbitrary fixed-size windows, the application tries to preserve the structure of the document. For example, a job entry or a requirements section stays together where possible.
+
+The chunks are embedded in batches.
+
+At the same time, Haiku extracts a structured profile. For a job description this includes things such as must-have and nice-to-have requirements. For a CV it extracts skills and supporting evidence.
+
+The result is validated using the shared Zod schemas. If validation fails, there is one repair attempt. The document and extracted information are then written in a single transaction.
+
+### Asking a question
+
+Before answering, Haiku classifies the question. The current intents are:
+
+* `fit`
+* `gaps`
+* `compare`
+* `interview_prep`
+* `general`
+* `off_topic`
+
+If the user mentions something specific such as “Job #2”, a job title or a company, that information becomes a hard filter for retrieval.
+
+Retrieval combines two approaches:
+
+1. pgvector cosine similarity
+2. Postgres full-text search
+
+The results are combined using reciprocal rank fusion.
+
+The retrieved documents are passed to the answer model as escaped, untrusted data with short citation references. Sonnet then streams the response over SSE.
+
+The server also checks the citations afterwards, so the model can't cite a chunk that wasn't actually included in the context it received.
+
+More detailed diagrams covering the API internals, upload and chat flows, retrieval, authentication, data model, CI and the AWS deployment are in `docs/architecture.md`.
+
+The requirements from the original brief are mapped to their implementation and tests in `docs/traceability.md`.
+
+## RAG and LLM approach
+
+I deliberately kept the architecture fairly small rather than introducing a framework for every part of the RAG pipeline.
+
+| Area              | Choice                                                                                                                    | Alternatives considered                  | Reason                                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| LLM               | Claude Sonnet 5 for answers and fit analysis; Haiku 4.5 for routing, extraction, summaries and evaluation                 | One model for everything                 | Routing and extraction are repetitive, structured tasks where a smaller model is sufficient. The user-facing reasoning gets the stronger model.                                                  |
+| Embeddings        | Voyage `voyage-3-large`, 1024 dimensions, with OpenAI `text-embedding-3-small` as an alternative                          | Local sentence-transformers              | Good retrieval quality without having to host another model. The fixed 1024-dimensional column also makes changing providers relatively straightforward.                                         |
+| Vector store      | Postgres + pgvector using HNSW and cosine similarity                                                                      | Pinecone, Qdrant, Chroma                 | There isn't much value in running another database at this scale. Postgres already stores the documents, chunks, full-text data, sessions and caches.                                            |
+| Orchestration     | Plain TypeScript with small modules and an `LLM` interface                                                                | LangChain, LlamaIndex                    | The pipeline isn't complicated enough to justify another abstraction layer. Keeping it in TypeScript makes the prompts and control flow easier to inspect and test.                              |
+| Chunking          | Structure-aware chunks based on headings, sections and paragraphs                                                         | Fixed 512-token windows                  | CVs and job descriptions are already fairly structured. Keeping those sections together produces better retrieval and more useful citations.                                                     |
+| Retrieval         | Hybrid vector + full-text retrieval using RRF, k=60                                                                       | Vector-only retrieval, learned re-ranker | Full-text search is useful for exact terms such as “Go” or “SOC 2”, which embeddings don't always handle well. I didn't see enough evidence in the evaluation to justify adding a re-ranker yet. |
+| Context           | Intent-specific strategy. Fit, gaps and comparison questions receive the extracted profiles as well as retrieved evidence | Top-k only                               | With a small document collection, completeness is more useful than aggressively reducing tokens.                                                                                                 |
+| Prompt/history    | System rules, escaped document blocks and the last six messages within a token budget                                     | Full conversation history, vector memory | Keeps the cost predictable without losing the immediate context of the conversation. Older messages are summarised by Haiku.                                                                     |
+| Structured output | JSON-schema constrained generation followed by Zod validation and one repair attempt                                      | Tool calls, regex parsing                | The same Zod schemas can be used for the API contract, model output and validation.                                                                                                              |
+| Guardrails        | Server-side citation validation, document escaping, rate limits and fixed off-topic responses                             | Separate moderation/injection classifier | This gives a relatively simple set of controls that can be tested. A dedicated classifier would be something I'd consider if abuse became a real problem.                                        |
+| Evaluation        | 26-case golden set covering routing, retrieval, citations, follow-ups and fit-matrix accuracy                             | Manual testing                           | The evaluations give me something repeatable to run whenever the retrieval or prompting changes.                                                                                                 |
+| Observability     | Pino logs plus optional Langfuse traces                                                                                   | Full OpenTelemetry setup                 | Langfuse is useful for looking at LLM calls, token usage and costs without building all of that myself.                                                                                          |
+
+## Some of the decisions I made
+
+### 1. Profiles plus evidence for analytical questions
+
+For questions such as “What am I missing?”, I decided to give the model the complete extracted requirement profile as well as the retrieved evidence.
+
+That uses a few more tokens, but it avoids a problem with ordinary top-k retrieval: the one requirement the user actually needs to know about could be the one that gets left out.
+
+This is reasonable while the corpus is small. If the application were handling hundreds of documents, I'd probably revisit it.
+
+### 2. Fake providers are part of the application
+
+The fake AI and embedding implementations aren't just mocks for individual tests. They're usable providers for the whole application.
+
+That means the test suite and CI can run without API keys, and the results are deterministic.
+
+The downside is that getting 100% in fake mode doesn't tell me that the actual answers produced by Claude are good. It mostly proves that the plumbing works. That's why I also run the evaluation suite against the real models and keep those results separate.
+
+### 3. Short citation references
+
+The model uses references such as `[C3]` rather than UUIDs.
+
+In practice, short references are much easier for the model to reproduce reliably. The server then checks every reference and removes anything that wasn't actually supplied to the model.
+
+That means the UI shouldn't be able to link to evidence that wasn't part of the answer's context.
+
+### 4. Synchronous ingestion
+
+At the moment, uploads are processed synchronously.
+
+For this project that's fine. Documents normally finish processing within a few seconds and the UI shows progress for each file.
+
+Adding a queue locally would introduce another moving part without providing much of a visible benefit. The AWS design describes where I would introduce asynchronous processing if the application were scaled up.
+
+### 5. Cached fit matrices
+
+The fit analysis is one of the more expensive model calls, so the result is calculated once per job and cached until one of the relevant documents changes.
+
+There's no reason to regenerate the same analysis every time the user opens it.
 
 ## Engineering standards
 
-**Followed**
-- Strict TypeScript (`noUncheckedIndexedAccess`, no `any`), with shared Zod
-  contracts validated at the API boundary and in the client.
-- Every I/O dependency is injected (`Store`, `LLM`, `Embedder`, `Tracer`),
-  so there are no network calls in unit tests.
-- Pure logic has unit tests (chunking, RRF with worked examples, mentions,
-  history trimming, citations, prompt snapshot, SSE parser). Routes are
-  tested with `app.inject()`. There's a real-Postgres integration test via
-  testcontainers, one Playwright journey, and the golden-set evals.
-- Structured logs with request ids, and tests proving document text and
-  keys never reach logs.
-- Conventional commits in small phases, CI running typecheck, tests, build,
-  evals and e2e, and Docker Compose from a clean clone.
+### What I followed
 
-**Skipped, and why**
-- Third-party identity (SSO, OAuth), email verification and password reset:
-  accounts are email + password only (see the AWS plan for Cognito).
-- ESLint/Prettier config: strict `tsc` catches more of what matters here,
-  and a formatter is a quick follow-up.
-- Load testing and horizontal scaling: out of scope for a local assistant.
-- Conversation history UI: the server persists messages for context, but
-  there's no "reopen a past chat" screen.
+* Strict TypeScript, including `noUncheckedIndexedAccess` and no `any`.
+* Shared Zod contracts at the API boundary and in the client.
+* Dependency injection for the store, LLM, embedder and tracer, so unit tests don't make network calls.
+* Unit tests for the core logic, including chunking, RRF, mentions, history trimming, citations, prompt snapshots and SSE parsing.
+* Route tests using `app.inject()`.
+* A real Postgres integration test using testcontainers.
+* A Playwright end-to-end journey.
+* Golden-set evaluations.
+* Structured logs with request IDs.
+* Tests that make sure document contents and API keys don't end up in logs.
+* Small conventional commits and CI covering typechecking, tests, builds, evaluations and E2E tests.
+* Docker Compose support from a clean checkout.
+
+### Things I deliberately left out
+
+There are a few things I didn't implement because they felt outside the scope of this version:
+
+* SSO/OAuth, email verification and password reset. The local version uses email and password; the AWS plan moves this to Cognito.
+* ESLint and Prettier configuration. Strict TypeScript covers most of the immediate correctness concerns, and formatting would be an easy follow-up.
+* Load testing and horizontal scaling.
+* A conversation-history screen. Messages are stored and used for context, but there isn't currently a UI for reopening an old conversation.
 
 ## Privacy and data handling
 
-- Each account sees only its own documents and conversations. Every query
-  is scoped by user id, and another user's ids return 404. Passwords are
-  hashed with scrypt, session cookies are httpOnly and SameSite=Lax, and
-  only a hash of each session token is stored.
-- Documents, chunks, embeddings and conversations are stored only in your
-  local Postgres (or in memory). Nothing is sent anywhere except the model
-  and embedding providers you configure. `DELETE /documents/:id` (the bin
-  icon in the UI) removes a document with its chunks and cached analysis,
-  and `docker compose down -v` removes everything.
-- Logs never contain document text or API keys. Error serialisation strips
-  database query parameters, and a test enforces it.
-- When Langfuse is enabled, traces contain the question, the answer, chunk
-  ids, token counts and cost, but not document text.
-- The fixtures in `evals/fixtures` are fictional. Don't commit real resumes
-  to a public repo.
+Each account is isolated from the others. Queries are scoped by `user_id`, and attempting to access another user's document returns a 404.
+
+Passwords are hashed using scrypt. Session cookies are `httpOnly` and `SameSite=Lax`, and only a hash of the session token is stored.
+
+Documents, chunks, embeddings and conversations stay in the local Postgres database (or the in-memory store when that's being used). The only external services they are sent to are the model and embedding providers that the user configures.
+
+Documents can be deleted from the UI, which also removes their chunks and cached analysis.
+
+There is also an account deletion endpoint, `DELETE /auth/account`, which requires the user's password and removes everything belonging to the account in one transaction. I haven't added a button for this to the UI yet.
+
+Running:
+
+```bash
+docker compose down -v
+```
+
+removes the local database and its contents.
+
+Logs don't contain document text or API keys. Error serialisation also strips database query parameters, and there is a test specifically checking for this.
+
+If Langfuse is enabled, traces contain information such as the question, answer, chunk IDs, token counts and cost, but not the actual document text.
+
+The files in `evals/fixtures` are fictional. Real CVs should not be committed to the public repository.
 
 ## Productionising on AWS
 
-- **Compute:** API and web on **ECS Fargate** behind an ALB (App Runner for a
-  smaller footprint). The web app could instead be static on S3 + CloudFront.
-- **Data:** **RDS PostgreSQL** (pgvector is supported) with Multi-AZ,
-  automated backups and PITR. Migrations run as a one-off ECS task in the
-  deploy pipeline, not on container start.
-- **Uploads:** a presigned PUT to **S3** (SSE-KMS, lifecycle rules for
-  retention). S3 event → **SQS** → an ingestion worker (Fargate) that parses,
-  embeds and extracts, with a DLQ and per-document status the UI polls. That
-  takes slow provider calls off the request path and makes retries safe.
-- **Secrets:** **Secrets Manager** for the Anthropic, embedding and Langfuse
-  keys, injected as ECS secrets. IAM task roles, no static credentials.
-- **Auth and tenancy:** the app already has per-user accounts with every
-  query scoped by `user_id`. In production, swap the local email/password
-  login for **Cognito** (hosted UI, MFA, password reset) verified by the
-  API, set `COOKIE_SECURE=1` behind HTTPS, and consider Postgres row-level
-  security as a second line of defence.
-- **Observability:** pino JSON → **CloudWatch Logs**, with metrics from log
-  fields (latency, tokens, cost per request). **OpenTelemetry** traces to
-  X-Ray alongside Langfuse for LLM traces. Alarms on error rate, p95
-  latency and daily spend.
-- **Cost controls:** per-user rate limits and daily token budgets, stored
-  in Redis/ElastiCache so every instance shares them. Haiku for all
-  high-volume steps, prompt caching on the stable system prompt and document
-  block, the fit cache, capped `max_tokens`, and AWS Budgets alerts. Evals
-  run on every PR in fake mode and nightly in real mode.
-- **Security:** WAF on the ALB, private subnets for RDS, VPC endpoints for
-  S3 and Secrets Manager, and a data retention policy with a "delete my
-  data" job.
+The local version is intentionally simple. If I were taking this into production, I'd change a few pieces.
+
+### Compute
+
+The API and web application could run on ECS Fargate behind an Application Load Balancer. For a smaller deployment, App Runner would also be an option.
+
+The frontend could alternatively be served as static files from S3 behind CloudFront.
+
+### Database
+
+I'd move Postgres to RDS with pgvector enabled, Multi-AZ, automated backups and point-in-time recovery.
+
+Database migrations would run as a one-off ECS task during deployment rather than every time a container starts.
+
+### Document processing
+
+Uploads would go directly to S3 using presigned PUT URLs.
+
+An S3 event would then trigger SQS, which would feed an ingestion worker running on Fargate. That worker would handle parsing, embedding and extraction.
+
+This would keep slower provider calls out of the user's request and make retries much safer. A dead-letter queue would handle documents that repeatedly fail.
+
+### Secrets
+
+API keys would be stored in AWS Secrets Manager and injected into ECS tasks.
+
+IAM task roles would be used instead of static AWS credentials.
+
+### Authentication
+
+The application already has the basic concept of per-user accounts and scopes every query by `user_id`.
+
+For production, I'd replace the local email/password authentication with Cognito, giving the application MFA, password reset and a hosted authentication flow.
+
+HTTPS would also allow secure cookies, and Postgres row-level security could provide another layer of isolation.
+
+### Observability
+
+Application logs would go through CloudWatch.
+
+I'd collect metrics such as latency, token usage and cost per request, with OpenTelemetry/X-Ray handling infrastructure traces and Langfuse continuing to handle the LLM-specific tracing.
+
+I'd also add alarms around error rates, p95 latency and daily spend.
+
+### Cost controls
+
+I'd add per-user rate limits and daily token budgets, shared through Redis/ElastiCache so that multiple application instances use the same limits.
+
+Other cost controls would include:
+
+* using Haiku for the high-volume structured tasks
+* prompt caching for stable prompts and document blocks
+* the existing fit cache
+* sensible `max_tokens` limits
+* AWS Budget alerts
+* fake-mode evaluations on every pull request
+* scheduled real-model evaluations
+
+### Security
+
+The production environment would use WAF, private subnets for RDS, VPC endpoints where appropriate, and an explicit data-retention policy including a proper “delete my data” workflow.
 
 ## How AI tools were used
 
-This reference build was written by an AI coding assistant (Claude Code),
-working from `CLAUDE.md`, in six phases. Each phase started with a written
-plan in `docs/reference-notes.md` and ended with `pnpm typecheck && pnpm test`
-green and a commit. Checks that caught the assistant's own mistakes:
+This project was written with the help of Claude Code.
 
-- **A wrong hand calculation:** a worked RRF example in the test was off by
-  one in the sixth decimal place (1/61 + 1/62). The code was right, and the
-  test comment was fixed.
-- **Streaming silently defeated:** the first version wrapped generation in a
-  timing helper that buffered every token before yielding. It was caught in
-  review of the diff and rewritten with explicit spans.
-- **A log leak:** the error serializer kept stack traces, which repeat the
-  error message, which for database errors includes query parameters (i.e.
-  document text). A sentinel-string log test caught it.
-- **Layout overflow:** a long citation snippet widened the chat column past
-  the viewport. It was found by taking Playwright screenshots, not by the
-  tests.
-- **Routing blind spot:** "What benefits does Ledgerline offer?" was refused
-  as off-topic. The eval flagged it, and the fix was a code-level rule: a
-  question naming an uploaded job is never off-topic.
+I worked from `CLAUDE.md` and built the application in six phases. Each phase started with a written plan in `docs/reference-notes.md` and ended with:
 
-Guidelines followed: fakes before real providers, tests with every change,
-no new dependencies without approval, and model IDs checked against current
-provider documentation rather than recalled.
+```bash
+pnpm typecheck && pnpm test
+```
+
+passing before committing the changes.
+
+The AI assistant was useful, but it also made mistakes. Several of them were caught through the tests and review process.
+
+### A few examples
+
+**RRF calculation**
+
+One of the worked RRF examples in a test was wrong by a tiny amount. The code itself was correct, but the comment had an incorrect calculation of `1/61 + 1/62`. The test review caught it and the comment was corrected.
+
+**Streaming**
+
+The first implementation accidentally buffered the entire model response inside a timing helper before yielding it. That meant the supposedly streaming endpoint wasn't actually streaming.
+
+Reviewing the diff exposed the problem, and I rewrote that part to use explicit tracing spans around the streaming process.
+
+**A logging leak**
+
+The error serializer was initially retaining stack traces. For database errors, those traces could contain query parameters, which in turn could contain document text.
+
+A test using a sentinel string caught the issue, and the serializer was changed so that this information couldn't make it into the logs.
+
+**Layout overflow**
+
+A long citation snippet could make the chat column wider than the viewport.
+
+The automated tests didn't catch this, but the problem showed up in a Playwright screenshot. That led to a UI fix.
+
+**Routing edge case**
+
+A question such as “What benefits does Ledgerline offer?” was initially classified as off-topic.
+
+The evaluation suite exposed the problem. The fix was a simple application-level rule: if a question explicitly names one of the uploaded jobs, it shouldn't be treated as off-topic.
+
+The general development rules were to use fakes before real providers, run tests with every change, avoid adding dependencies without a reason, and check model IDs against the provider documentation rather than relying on memory.
 
 ## Known limitations
 
-- Fake mode is for demos and CI. Its answers are keyword heuristics.
-- Injection defence is layered but not a guarantee. There's no classifier
-  for injected document text.
-- Fit judgements are an LLM's reading of the resume. "Met with no citable
-  evidence" is downgraded to partial, but a wrong judgement is still
-  possible.
-- Evals use the in-memory store, so Postgres full-text ranking is covered by
-  the integration test, not by the golden set.
-- Scanned (image-only) PDFs aren't OCR'd, and the user is told so.
-- Changing the embedding provider requires re-uploading documents. The
-  model is recorded per document, but mixed embeddings aren't detected.
+There are still some limitations in the current version:
+
+* Fake mode is intended for demos and CI. Its answers are based on keyword heuristics.
+* The injection defence is layered, but it isn't a guarantee. There isn't currently a separate classifier for malicious instructions hidden inside uploaded documents.
+* Fit judgements are still an LLM interpretation of the CV. If there isn't citable evidence for a “met” judgement, the system downgrades it to partial, but the underlying judgement can still be wrong.
+* The evaluation suite uses the in-memory store, so Postgres full-text ranking is tested separately through the integration test rather than the golden set.
+* Image-only/scanned PDFs aren't OCR'd. The user is told when this happens.
+* Switching embedding providers requires documents to be re-uploaded. The chat interface detects mismatches and identifies the documents that need re-uploading.
+* Indirect follow-ups such as “what about the second one?” can lose the explicit job filter. The conversation history often lets the model work out which job the user means, but retrieval still searches across all jobs. This is covered by the `multi-01` evaluation case.
 
 ## What I'd do with more time
 
-- A real-model eval run in CI on a schedule, with trend tracking in Langfuse
-  datasets.
-- Re-ranking (e.g. a cross-encoder) if hit@k drops on a larger golden set.
-- Background ingestion with per-document status and retries.
-- Conversation history UI, export of the fit matrix, and cover-letter
-  drafting grounded in the same evidence.
-- Email verification, password reset and per-user budgets (see the AWS plan).
+There are a few things I'd tackle next to make it better:
+
+* Run real-model evaluations automatically on a schedule and track the results over time in Langfuse.
+* Add a re-ranking stage, such as a cross-encoder, if retrieval performance starts dropping as the evaluation set grows.
+* Move ingestion into background workers with document status and retries.
+* Add a proper conversation-history screen.
+* Allow users to export the fit matrix.
+* Add grounded cover-letter drafting using the same evidence system.
+* Add email verification, password reset and per-user usage budgets.
+
+Also I will be candid and say yes I did overbuild it a bit. I do think it is all defensible but if I did it again, I'd stop after the core plus evals, and spend the extra time on real-model evaluation sooner.

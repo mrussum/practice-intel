@@ -134,6 +134,10 @@ export const Credentials = z.object({
 });
 export type Credentials = z.infer<typeof Credentials>;
 
+/** DELETE /auth/account body: the password again, so a stolen session alone can't erase an account. */
+export const DeleteAccount = z.object({ password: z.string().min(1).max(200) });
+export type DeleteAccount = z.infer<typeof DeleteAccount>;
+
 /** The signed-in user. */
 export const Me = z.object({
   id: z.string().uuid(),

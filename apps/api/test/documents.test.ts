@@ -42,6 +42,17 @@ describe("POST /documents", () => {
     ]);
   });
 
+  it("never reuses a deleted job's number", async () => {
+    const { app } = await setup();
+    for (const name of ["a.md", "b.md", "c.md"]) await upload(app, "job", name, SAMPLE_JOB);
+    const before = (await app.inject({ method: "GET", url: "/documents" })).json() as DocumentSummary[];
+    const job3 = before.find((d) => d.label === "Job #3")!;
+    expect((await app.inject({ method: "DELETE", url: `/documents/${job3.id}` })).statusCode).toBe(204);
+
+    const res = await upload(app, "job", "d.md", SAMPLE_JOB);
+    expect((res.json() as DocumentSummary).label).toBe("Job #4");
+  });
+
   it.each([
     ["missing kind", "/documents", "a.md", SAMPLE_JOB, 400, "invalid_kind"],
     ["bad kind", "/documents?kind=cover_letter", "a.md", SAMPLE_JOB, 400, "invalid_kind"],

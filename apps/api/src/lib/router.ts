@@ -3,7 +3,7 @@ import { Intent } from "@career-intel/shared";
 import type { LLM, LlmUsage } from "./llm.js";
 import { structured } from "./llm.js";
 
-const RouterOutput = z.object({ intent: Intent });
+export const RouterOutput = z.object({ intent: Intent });
 
 export const ROUTER_SYSTEM = `You classify a user's message for a career assistant. The user has uploaded a resume and job descriptions.
 Return one intent:

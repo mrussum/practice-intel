@@ -4,6 +4,7 @@
  * models by config alone.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { transformJSONSchema } from "@anthropic-ai/sdk/lib/transform-json-schema";
 import { z } from "zod";
 import type { Intent, JobProfile, Requirement, ResumeProfile } from "@career-intel/shared";
 import type { Config } from "../config.js";
@@ -100,6 +101,15 @@ function providerError(err: unknown): unknown {
   return err;
 }
 
+/**
+ * Anthropic's constrained decoding rejects some JSON Schema keywords
+ * (`minimum`, `maxLength`, ...) with a 400. The SDK's transform moves them
+ * into descriptions as hints; `structured()` still enforces them with Zod.
+ */
+export function providerSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  return transformJSONSchema(schema) as Record<string, unknown>;
+}
+
 export function anthropicLlm(config: Config): LLM {
   const client = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY, maxRetries: 2, timeout: 60_000 });
   const modelFor = (role: ModelRole) => (role === "answer" ? config.ANSWER_MODEL : config.FAST_MODEL);
@@ -121,7 +131,7 @@ export function anthropicLlm(config: Config): LLM {
           messages: [{ role: "user", content: req.prompt }],
           output_config: {
             ...effortFor(req.role),
-            ...(req.jsonSchema ? { format: { type: "json_schema", schema: req.jsonSchema } } : {}),
+            ...(req.jsonSchema ? { format: { type: "json_schema", schema: providerSchema(req.jsonSchema) } } : {}),
           },
         })
         .catch((err: unknown) => {

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { Credentials, type Me } from "@career-intel/shared";
+import { Credentials, DeleteAccount, type Me } from "@career-intel/shared";
 import type { Config } from "../config.js";
 import type { Deps } from "../deps.js";
 import { dummyHash, hashPassword, hashToken, newSessionToken, SESSION_COOKIE, SESSION_TTL_MS, verifyPassword } from "../lib/auth.js";
@@ -90,6 +90,21 @@ export async function authRoutes(app: FastifyInstance, { deps, config }: { deps:
     const token = req.cookies[SESSION_COOKIE];
     if (token) await deps.store.deleteAuthSession(hashToken(token));
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
+    return reply.code(204).send();
+  });
+
+  // Right to erasure: removes the account and all its data in one transaction.
+  app.delete("/auth/account", { ...limited, onRequest: authenticate(deps) }, async (req, reply) => {
+    const parsed = DeleteAccount.safeParse(req.body);
+    if (!parsed.success) throw new HttpError(400, "password_required", "Enter your password to confirm deleting your account.");
+    const user = userOf(req);
+    const record = await deps.store.findUserByEmail(user.email);
+    if (!record || !(await verifyPassword(parsed.data.password, record.passwordHash))) {
+      throw new HttpError(401, "invalid_password", "Password is incorrect. Your account was not deleted.");
+    }
+    await deps.store.deleteUser(user.id);
+    reply.clearCookie(SESSION_COOKIE, { path: "/" });
+    req.log.info("account deleted");
     return reply.code(204).send();
   });
 

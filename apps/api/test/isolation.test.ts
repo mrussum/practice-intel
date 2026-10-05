@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { DocumentSummary } from "@career-intel/shared";
 import { buildApp } from "../src/app.js";
-import { ask, SAMPLE_JOB, SAMPLE_RESUME, signUp, testConfig, testDeps, upload } from "./helpers.js";
+import { ask, PASSWORD, SAMPLE_JOB, SAMPLE_RESUME, signUp, testConfig, testDeps, upload } from "./helpers.js";
 
 let close: (() => Promise<void>) | undefined;
 afterEach(async () => close?.());
@@ -21,6 +21,25 @@ async function twoUsers() {
 }
 
 describe("per-user isolation", () => {
+  it("deleting Alice's account needs her password, erases only her data and ends her session", async () => {
+    const { bob, alice, job } = await twoUsers();
+    await upload(bob, "job", "bob-job.md", SAMPLE_JOB);
+    await ask(alice, "What skills am I missing for Job #1?");
+
+    const wrong = await alice.inject({ method: "DELETE", url: "/auth/account", payload: { password: "not her password" } });
+    expect(wrong.statusCode).toBe(401);
+    expect((await alice.inject({ method: "GET", url: `/documents/${job.id}` })).statusCode).toBe(200);
+
+    const res = await alice.inject({ method: "DELETE", url: "/auth/account", payload: { password: PASSWORD } });
+    expect(res.statusCode).toBe(204);
+    expect(res.cookies.find((c) => c.name === "ci_session")?.value).toBe("");
+    expect((await alice.inject({ method: "GET", url: "/auth/me" })).statusCode).toBe(401);
+    const login = await alice.server.inject({ method: "POST", url: "/auth/login", payload: { email: "alice@example.com", password: PASSWORD } });
+    expect(login.statusCode).toBe(401);
+    // Bob is untouched.
+    expect(((await bob.inject({ method: "GET", url: "/documents" })).json() as unknown[]).length).toBe(1);
+  });
+
   it("Bob's document list doesn't include Alice's documents", async () => {
     const { bob, alice } = await twoUsers();
     expect((await bob.inject({ method: "GET", url: "/documents" })).json()).toEqual([]);
