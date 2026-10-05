@@ -406,3 +406,4 @@ There are a few things I'd tackle next to make it better:
 * Add grounded cover-letter drafting using the same evidence system.
 * Add email verification, password reset and per-user usage budgets.
 
+Also I will be candid and say yes I did overbuild it a bit. I do think it is all defensible but if I did it again, I'd stop after the core plus evals, and spend the extra time on real-model evaluation sooner.
