@@ -101,11 +101,11 @@ means `apps/web/…`.
 | --- | --- | --- |
 | Accounts with per-user isolation (scrypt passwords, httpOnly session cookies, Origin check) | `api/src/lib/auth.ts`, `api/src/routes/auth.ts`, store scoping, `web/src/components/AuthScreen.tsx` | `auth.test.ts`, `auth-routes.test.ts`, `isolation.test.ts`, integration test, e2e |
 | Security headers and CSP on the web container | `web/nginx.conf.template` | Browser checks (outbound fetch and injected script blocked) |
+| Fit-matrix accuracy against hand labels | `evals/fit.ts`, `evals/fit-labels.json` (owner's labels) | `evals/fit-report.md`: 24/26 exact match, no requirement labelled missing was called met (23–24/26 across runs) |
 | Dependency audit in CI and Dependabot; dev tooling upgraded to clear all advisories | `.github/workflows/ci.yml` (`audit`), `.github/dependabot.yml` | `pnpm audit`: no known vulnerabilities |
 
 ## Open items
 
-1. Fill in `evals/fit-labels.json` by hand and run `pnpm eval:fit --real`.
-2. Resolve indirect job references in follow-ups ("the second one") so retrieval keeps the job filter (`multi-01` fails).
-3. Run `docker compose up --build` from a fresh clone on a normal machine.
-4. Run an automated accessibility check (for example axe in the Playwright test).
+1. Resolve indirect job references in follow-ups ("the second one") so retrieval keeps the job filter (`multi-01` fails).
+2. Run `docker compose up --build` from a fresh clone on a normal machine.
+3. Run an automated accessibility check (for example axe in the Playwright test).

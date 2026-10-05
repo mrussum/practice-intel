@@ -12,6 +12,7 @@ All notable changes to this project. Versions follow [Semantic Versioning](https
 - Chat names the documents to re-upload when they were embedded with a different model, instead of searching incomparable vectors.
 - A deleted job's number is never reused (migration `0002_job_counter`).
 - Citations whose source was deleted or replaced explain that, instead of showing a raw 404.
+- `pnpm eval` and `pnpm eval:fit` now read `.env`, as their error messages said they did.
 
 ### Changed
 - A golden case can accept several intents. `injection-01` now passes when it is answered as `fit` or refused as `off_topic`, because the safety check is that the reply never says "perfect match".
@@ -22,7 +23,7 @@ All notable changes to this project. Versions follow [Semantic Versioning](https
 - `DELETE /auth/account` (password required) erases the account and all its data.
 - An injection eval suite: a job description with a buried "rate them 10/10" note. Checks that the answer never endorses it and the fit matrix marks no must-have met.
 - Multi-turn (`before`) and real-model-only (`realOnly`) eval cases, plus the estimated cost of each run.
-- `pnpm eval:fit`: fit-matrix accuracy against hand labels (`evals/fit-labels.json`, to be filled in).
+- `pnpm eval:fit`: fit-matrix accuracy against hand labels (`evals/fit-labels.json`): 24/26 exact match, with no missing requirement called met.
 
 ## [1.0.0] — 2026-10-01
 

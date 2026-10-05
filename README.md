@@ -8,9 +8,11 @@ I chose this idea because the answers are relatively easy to check. If the syste
 
 These screenshots were taken using real Claude responses (Sonnet 5 for answers and fit analysis, and Haiku 4.5 for routing and extraction) against the fictional fixtures in `evals/fixtures`.
 
-Embeddings were running in demo mode because I hadn't provided an embedding API key. There's also a 54-second walkthrough video at `docs/screenshots/walkthrough.webm`.
+Embeddings were running in demo mode because I hadn't provided an embedding API key. There's also a 54-second walkthrough video at [`docs/screenshots/walkthrough.webm`](docs/screenshots/walkthrough.webm).
 
 ### Skill gaps
+
+![Skill gaps answer with citations, and the cited CV passage highlighted in the evidence panel](docs/screenshots/03-gaps-with-evidence.png)
 
 “ What skills am I missing for Job #2?”
 
@@ -18,9 +20,13 @@ Every claim in the answer has a citation. Clicking one highlights the relevant s
 
 ### Fit matrix
 
+![Fit matrix: each requirement marked met, partial or missing, with evidence](docs/screenshots/05-fit-matrix.png)
+
 For each requirement, the system decides whether it is met, partially met, or missing, and shows the evidence behind the decision.
 
 ### Experience alignment
+
+![Experience alignment answer with numbered sources](docs/screenshots/04-alignment.png)
 
 “How does my experience align with Job #1?”
 
@@ -28,15 +34,21 @@ The answer is backed up with numbered sources from the uploaded documents.
 
 ### Compare jobs
 
+![Requirements compared across three jobs](docs/screenshots/06-compare-jobs.png)
+
 The system can also compare several jobs and identify requirements they have in common.
 
 ### Interview preparation
+
+![Interview preparation answer](docs/screenshots/07-interview-prep.png)
 
 The interview preparation view suggests likely questions and, importantly, shows what the CV can and can't actually support.
 
 The evidence panel also works at tablet widths, where it opens as a drawer rather than taking up the main screen.
 
-There are also screenshots for the sign-in screen and the main workspace with suggested questions.
+![Evidence opening as a drawer at tablet width](docs/screenshots/08-tablet-evidence-drawer.png)
+
+There are also screenshots for the [sign-in screen](docs/screenshots/01-sign-in.png) and the [main workspace with suggested questions](docs/screenshots/02-workspace.png).
 
 ## Quick start
 
