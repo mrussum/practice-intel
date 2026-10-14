@@ -14,7 +14,7 @@
     "test:e2e": "pnpm --filter @career-intel/web test:e2e"
   },
   "devDependencies": {
-    "typescript": "^5.6.0"
+    "typescript": "^7.0.2"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
